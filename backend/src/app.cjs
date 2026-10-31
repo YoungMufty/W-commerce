@@ -276,7 +276,11 @@ app.use(cors({
     origin: process.env.NODE_ENV === 'production' ? process.env.FRONTEND_URL : true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token', 'Idempotency-Key', 'Paystack-Signature', 'stripe-signature']
+    allowedHeaders: [
+        'Content-Type', 'Authorization', 'x-csrf-token', 'Idempotency-Key',
+        'Paystack-Signature', 'stripe-signature', 'X-Requested-With',
+        'Accept', 'sentry-trace', 'baggage', 'Cache-Control', 'Pragma'
+    ]
 }));
 
 
@@ -374,7 +378,7 @@ app.use(['/api', '/api/v1'], (req, res, next) => {
 
 
 // Health & readiness probe (single definition)
-app.get('/health', async (req, res) => {
+app.get(['/health', '/api/health', '/api/v1/health'], async (req, res) => {
     const status = { uptime: process.uptime(), redis: redisManager.getStatus(), env: process.env.NODE_ENV || 'development' };
     try { await prisma.$queryRawUnsafe('SELECT 1'); status.database = { ok: true }; }
     catch (err) { status.database = { ok: false, error: err.message }; }

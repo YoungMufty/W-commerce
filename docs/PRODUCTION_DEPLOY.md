@@ -32,8 +32,14 @@ npm run db:migrate:deploy      # creates all 114 tables from the baseline migrat
 
 The Docker images run `prisma migrate deploy` automatically on start.
 
-> Your existing SQLite data is **not** migrated automatically. Use fresh data in production, or export and
-> import what you need.
+### Migrating Existing SQLite Data to PostgreSQL
+If you have local products, stores, users, addresses, or test orders in SQLite that you want to move to your live PostgreSQL database, run:
+
+```bash
+node scripts/migrate-sqlite-to-postgres.cjs "postgresql://USER:PASSWORD@HOST:5432/DB?schema=public"
+# or set TARGET_DATABASE_URL in .env.production and run:
+npm run db:migrate-data
+```
 
 ## 2. Environment (`.env.production`)
 
@@ -48,6 +54,13 @@ The Docker images run `prisma migrate deploy` automatically on start.
   `TWILIO_*` (or `TERMII_API_KEY`) with `SMS_PROVIDER` set, `REDIS_URL`, `SENTRY_DSN`, `GEMINI_API_KEY`, `QLOO_API_KEY`.
 - `ALLOW_MOCK_EXTERNAL_APIS` must stay unset. Mock mode is already disabled whenever `NODE_ENV=production`.
 
+### Pre-Flight Environment Validation
+Before deploying, run the automated environment validator to check for missing keys, short secrets, or lingering placeholders:
+
+```bash
+npm run env:validate
+```
+
 ## 3. Deploy
 
 ```bash
@@ -59,7 +72,7 @@ Put a TLS-terminating proxy (Caddy, Cloudflare or your host's load balancer) in 
 
 ## 4. Smoke test (staging first, Stripe and Paystack in test mode)
 
-1. `GET /health` returns OK.
+1. `GET /health` (or `/api/health`, `/api/v1/health`) returns `{"status":"ok"}`.
 2. Sign up, verify email, log in (buyer, seller, courier).
 3. Place an order and complete a payment, then check the order detail page.
 4. Mark a notification read (uses `PATCH`) and toggle courier availability.

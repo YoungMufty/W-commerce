@@ -13,7 +13,9 @@
     "build:production": "npm run build --workspace=frontend",
     "db:sync-postgres-schema": "node scripts/sync-postgres-schema.cjs",
     "db:generate:prod": "prisma generate --schema=database/prisma/postgres/schema.prisma",
-    "db:migrate:deploy": "prisma migrate deploy --schema=database/prisma/postgres/schema.prisma"
+    "db:migrate:deploy": "prisma migrate deploy --schema=database/prisma/postgres/schema.prisma",
+    "db:migrate-data": "node scripts/migrate-sqlite-to-postgres.cjs",
+    "env:validate": "node scripts/validate-production-env.cjs"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0"
