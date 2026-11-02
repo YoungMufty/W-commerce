@@ -148,7 +148,7 @@ export default defineConfig(({ mode }) => {
     },
     server: isDev ? {
       host: '::',
-      port: 5175,
+      port: 5178,
       strictPort: false,
       proxy: {
         // Forward all /api requests to Express backend — DEV ONLY
