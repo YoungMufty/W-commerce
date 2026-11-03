@@ -278,6 +278,76 @@ async function handleStylingAdvice(lower, lastMsg) {
 /**
  * Intelligent Food, Dining & Hunger Consultation
  */
+async function handleStockAdvice(lower, lastMsg) {
+    try {
+        const cleanSubject = lower
+            .replace(/\b(can\s+you\s+)?(check|tell\s+me|is|are|do\s+you\s+have|how\s+many|what\s+is\s+the|status\s+of|the|a|an|any|in\s+stock|out\s+of\s+stock|remain\s+in\s+stock|remaining\s+in\s+stock|left\s+in\s+stock|inventory\s+for|stock\s+for|units\s+in\s+stock|available\s+in\s+stock|available\s+in\s+w-commerce|available|left|remain|remaining|finished|finish|sold\s+out|please)\b/gi, ' ')
+            .replace(/[^a-z0-9\s-]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        let product = null;
+        if (cleanSubject.length >= 2) {
+            product = await prisma.product.findFirst({
+                where: {
+                    isArchived: false,
+                    OR: [
+                        { title: { contains: cleanSubject } },
+                        { description: { contains: cleanSubject } }
+                    ]
+                },
+                include: { store: true, images: true }
+            });
+        }
+
+        if (!product) {
+            return "🔍 **Product Not Found in W-Commerce Market** 📦\n\n" +
+                "We searched our verified local merchants and could not find **\"" + (cleanSubject || "this item") + "\"** in current W-Commerce inventory.\n\n" +
+                "### 💡 What You Can Do:\n" +
+                "1. 🔎 **Search Similar Items:** Try searching with a broader keyword to explore related in-stock options.\n" +
+                "2. 🌐 **Import From Any Global Store:** If you find this product on **Amazon, AliExpress, Jumia, or Konga**, paste its URL right here into PayAI! We will import it and protect your purchase with W-Commerce Escrow.\n\n" +
+                "[🔍 Browse Available Products](prompt:show all products)";
+        }
+
+        const stock = Number(product.stock || 0);
+        const sellerName = product.store?.storeName || 'Verified Merchant';
+        const priceDisplay = "₦" + Number(product.price || 0).toLocaleString() + " NGN";
+
+        if (stock === 0) {
+            return "❌ **Product Finished / Out of Stock: \"" + product.title + "\"** 📦🚫\n\n" +
+                "⚠️ This product has **completely finished** and is currently out of stock with verified merchant *" + sellerName + "* (**0 units remaining in stock**).\n\n" +
+                "- **Seller:** " + sellerName + "\n" +
+                "- **Last Listed Price:** " + priceDisplay + "\n" +
+                "- **Inventory Status:** ❌ Finished / Sold Out\n\n" +
+                "### 💡 Suggested Next Steps:\n" +
+                "• 🔔 Tap **Alert Me When Restocked** to get notified as soon as inventory arrives!\n" +
+                "• 🔍 Ask PayAI to find similar in-stock alternatives from other verified merchants.\n\n" +
+                "[🔔 Alert Me When Restocked](prompt:notify me when " + product.title + " is restocked) " +
+                "[🔍 Find Similar Available Items](prompt:find alternatives for " + product.title + ")";
+        }
+
+        if (stock <= 5) {
+            const unitWord = stock === 1 ? "unit remains" : "units remain";
+            return "⚠️ **Low Stock Alert: Only " + stock + " " + unitWord + " in stock!** ⏳🔥\n\n" +
+                "**\"" + product.title + "\"** is in high demand, and our live inventory check confirms that **only " + stock + " " + unitWord + " in stock** with verified seller *" + sellerName + "*!\n\n" +
+                "- **Inventory Status:** ⚠️ Almost Finished (Only " + stock + " remaining)\n" +
+                "- **Unit Price:** " + priceDisplay + "\n" +
+                "- **Estimated Delivery:** " + (product.estimatedDeliveryDays || 3) + " business days\n\n" +
+                "👉 *Hurry and lock in your order before this item finishes!*\n\n" +
+                "[🛒 Add to Cart Now (" + priceDisplay + ")](prompt:add " + product.title + " to cart)";
+        }
+
+        return "✅ **In Stock & Ready for Dispatch: \"" + product.title + "\"** 📦✨\n\n" +
+            "Good news! We have **" + stock + " units available in stock** with verified merchant *" + sellerName + "*!\n\n" +
+            "- **Inventory Status:** ✅ Ample Stock Available (" + stock + " units)\n" +
+            "- **Unit Price:** " + priceDisplay + "\n" +
+            "- **Estimated Delivery:** " + (product.estimatedDeliveryDays || 3) + " business days\n\n" +
+            "[🛒 Add to Cart (" + priceDisplay + ")](prompt:add " + product.title + " to cart)";
+    } catch (_) {
+        return "📦 **W-Commerce Inventory Check:** Products in our catalog update in real-time. Feel free to ask about any specific item's stock or price!";
+    }
+}
+
 function handleRecipeAdvice(lower, lastMsg) {
     const isBreakfast = /breakfast|morning/i.test(lower);
     if (lower.includes('fried rice') || lower.includes('rice')) {
@@ -572,6 +642,14 @@ async function buildIntelligentReply(lastMsg = '', liveContext = '', options = {
         return await handleStylingAdvice(lower, lastMsg);
     }
 
+    // 7.3. Stock, Availability & Scarcity Consultation ("finish", "finished", "out of stock", "remain in stock", "not found")
+    const isStockIntent =
+        /\b(?:in\s+stock|out\s+of\s+stock|remain\s+in\s+stock|remaining\s+in\s+stock|check\s+stock|how\s+many\s+left|is\s+it\s+(?:finished|finish|available|sold\s+out)|product\s+finish|any\s+left|stock\s+status|stock\s+count|only\s+\d+\s+remain|not\s+found)\b/i.test(lower);
+
+    if (isStockIntent) {
+        return await handleStockAdvice(lower, lastMsg);
+    }
+
     // 7.4. Recipe, Ingredients & Cooking Consultation (Home preparation & culinary advice)
     const isRecipeIntent =
         /\b(?:recipe|recipes|ingredient|ingredients|how\s+(?:to|do\s+i|can\s+i)s+(?:cook|prepare|make|fry|bake)|list\s+(?:out\s+)?(?:all\s+)?(?:the\s+)?ingredients?|what\s+ingredients?|in\s+my\s+kitchen|in\s+my\s+fridge|in\s+my\s+pantry|cook\s+(?:at\s+home|for\s+(?:breakfast|lunch|dinner|myself))|steps\s+to\s+(?:prepare|cook|make)|how\s+is\s+.+?\s+(?:prepared|cooked|made)|guide\s+to\s+(?:cook|prepare|make))\b/i.test(lower);
@@ -859,6 +937,7 @@ function buildGeminiPayload(messages, liveContext, isJsonPrompt = false) {
         '  * Real interactive product cards and buttons ("Add to Cart", "Negotiate", "View Cart & Checkout") are automatically rendered beneath your message in the PayAI UI.',
         '  * PRODUCT IMAGES RULE: When introducing, listing, or recommending products to the user, you MUST include the product\'s image using markdown syntax: `![Product Title](ImageUrl)`. Place the image prominently with each product\'s title, price, and merchant so the buyer can visually see each item.',
         '  * SMART SUGGESTIONS & PERFECT PAIRINGS RULE: Whenever listing products or addressing buyer needs, ALWAYS include a dedicated, friendly, entertaining section below titled `### 💡 PayAI Smart Suggestions & Perfect Pairings`. Provide combo pairings (e.g. burger/sushi + chilled softdrink with total combo price), fashion outfit matching (e.g. trousers matching shirts/polos, shoe pairings, referencing past purchases), and tech matching (e.g. iPhone matching protective pouch color, watch straps), accompanied by 1-click suggestion prompt buttons like `[🥤 Add Cold Sprite (₦1,000)](prompt:add Sprite to cart)` or `[✨ Add Both as Combo (₦5,500)](prompt:add Original Crunch and Sprite to cart)`.',
+        '- PRODUCT INVENTORY, AVAILABILITY & FINISH AWARENESS RULE (CRITICAL):\n  * When a product is finished or has 0 stock: Clearly state that the item has "finished" / is "out of stock" in the W-Commerce market. NEVER say it is available or ask to order it. Offer restock alerts and similar alternatives.\n  * When a product has low stock (e.g. stock <= 5, such as "only 3 remain in stock"): Prominently highlight: "⚠️ Low Stock Alert: Only X remain in stock!" and advise the buyer to order before it finishes.\n  * When a product is not found in the catalog: Clearly state: "Product Not Found in W-Commerce market", provide external store search links, and remind the buyer they can paste external links to import via Escrow.',
         '- CULINARY, RECIPE & INGREDIENT INQUIRIES RULE: When a buyer asks for a recipe, cooking instructions, how to prepare food at home, or ingredients (e.g. "I have rice in my kitchen, list out all ingredient i need to get fried rice prepare for my breakfast"):\n  * NEVER force or assume a restaurant/prepared meal order (e.g. NEVER ask "How many would you like to order?").\n  * Directly provide the full culinary breakdown, ingredient list, and easy cooking steps.\n  * Only offer raw pantry/grocery ingredients (cooking oil, spices, seasoning cubes) from the marketplace as optional convenience.',
         '- PERSONALITY & COMMUNICATION STYLE:',
         '  * Maintain a friendly, witty, approachable, and emoji-accented tone (✨, 🎉, 🚀, 🤝, 💸, 🛒, 🥳, 💡, 🏷️, 📦)!',

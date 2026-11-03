@@ -943,8 +943,11 @@ class PayAIOrchestrator {
       }
 
       case 'check_product_stock': {
-        const { productId, quantity = 1 } = toolArgs;
-        return await catalogSearchService.checkProductStock(productId, quantity);
+        const { productId, productQuery, quantity = 1 } = toolArgs;
+        const target = productId || productQuery || toolArgs.prompt || toolArgs.userPrompt;
+        const res = await catalogSearchService.checkProductStock(target, quantity);
+        if (toolArgs.userPrompt) res.userPrompt = toolArgs.userPrompt;
+        return res;
       }
 
       case 'make_product_offer':
@@ -2076,6 +2079,28 @@ class PayAIOrchestrator {
           };
         }
 
+        const currentStock = Number(targetProduct.stock != null ? targetProduct.stock : 10);
+
+        // 1. Inventory check: Product finished / Out of stock
+        if (currentStock === 0 || targetProduct.isArchived) {
+          return {
+            success: false,
+            isFinished: true,
+            isOutOfStock: true,
+            stock: 0,
+            product: targetProduct,
+            message: `❌ Cannot add to cart: "${targetProduct.title}" has completely finished and is currently out of stock with merchant ${targetProduct.store?.storeName || 'Verified Merchant'}. Would you like me to notify you when restocked or find similar in-stock alternatives?`
+          };
+        }
+
+        // 2. Inventory check: Capping requested quantity to available stock (e.g. only 3 remain in stock)
+        let isPartialStock = false;
+        let requestedQty = quantity;
+        if (quantity > currentStock) {
+          quantity = currentStock;
+          isPartialStock = true;
+        }
+
         const targetProductId = String(targetProduct.id || targetProduct.productId);
         const finalPrice = Number(priceToUse || targetProduct.price || 0);
         const storeName = targetProduct.store?.storeName || targetProduct.sellerName || targetProduct.seller?.name || 'Verified W-Commerce Merchant';
@@ -2127,6 +2152,10 @@ class PayAIOrchestrator {
           success: true,
           action: 'CART_UPDATED',
           checkoutReady: true,
+          isPartialStock,
+          requestedQuantity: requestedQty,
+          actualQuantity: quantity,
+          stock: currentStock,
           item: {
             id: targetProductId,
             productId: targetProductId,
@@ -3802,14 +3831,50 @@ class PayAIOrchestrator {
       return { toolName: 'prepare_purchase_quote', toolArgs: {} };
     }
 
-    // Stock / Inventory Check
-    if (/\b(in\s+stock|stock\s+for|check\s+stock|how\s+many\s+left|inventory\s+for)\b/i.test(lower)) {
+    // Stock, Inventory, Availability, Finish & Scarcity Check
+    // Handles: "product finish", "is it finished?", "is it out of stock?", "only 3 remain in stock", "how many left", "is [product] available?", "not found"
+    const stockQueryPatterns = /\b(?:in\s+stock|out\s+of\s+stock|remain\s+in\s+stock|remaining\s+in\s+stock|left\s+in\s+stock|units?\s+in\s+stock|check\s+stock|stock\s+for|inventory\s+for|how\s+many\s+(?:left|remain|available|units)|(?:is\s+it|is\s+this|product|item)\s+(?:finished|finish|available|sold\s+out|out\s+of\s+stock)|do\s+you\s+have\s+any\s+(?:left|available|in\s+stock)|any\s+(?:left|remaining|available)|is\s+(?:there\s+)?any\s+stock|stock\s+status|stock\s+count|available\s+in\s+stock|available\s+in\s+w-commerce|not\s+available|not\s+found|product\s+finish|is\s+it\s+finished|has\s+it\s+finished|only\s+\d+\s+remain)\b/i;
+
+    if (stockQueryPatterns.test(lower) && !lower.includes('add to cart') && !lower.includes('buy now')) {
       const uuidMatch = text.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-      const targetId = contextData?.productId || (uuidMatch ? uuidMatch[0] : null);
-      if (targetId) {
+      let targetId = contextData?.productId || (uuidMatch ? uuidMatch[0] : null) || contextData?.lastSessionProductId || null;
+      let targetQuery = null;
+
+      // Extract requested quantity if user asks e.g. "do you have 5 in stock?" or "only 3 remain in stock"
+      const qtyMatch = lower.match(/\b(\d+)\s*(?:pcs|pieces|units|items|remain|remaining|left|in\s+stock)?\b/);
+      const requestedQty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
+
+      // Extract clean subject from prompt
+      const cleanSubject = lower
+        .replace(/\b(can\s+you\s+)?(check|tell\s+me|is|are|do\s+you\s+have|how\s+many|what\s+is\s+the|status\s+of|the|a|an|any|in\s+stock|out\s+of\s+stock|remain\s+in\s+stock|remaining\s+in\s+stock|left\s+in\s+stock|inventory\s+for|stock\s+for|units\s+in\s+stock|available\s+in\s+stock|available\s+in\s+w-commerce|available|left|remain|remaining|finished|finish|sold\s+out|please)\b/gi, ' ')
+        .replace(/[^a-z0-9\s-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      // Check if matches previous products in session
+      if (Array.isArray(contextData?.previousProducts) && contextData.previousProducts.length > 0) {
+        if (!targetId || (cleanSubject.length >= 3 && !targetId)) {
+          const match = contextData.previousProducts.find(p => {
+            const t = (p.title || '').toLowerCase();
+            return cleanSubject && (t.includes(cleanSubject) || cleanSubject.includes(t));
+          });
+          if (match) targetId = match.id || match.productId;
+        }
+      }
+
+      if (cleanSubject.length >= 2 && !targetId) {
+        targetQuery = cleanSubject;
+      }
+
+      if (targetId || targetQuery) {
         return {
           toolName: 'check_product_stock',
-          toolArgs: { productId: targetId }
+          toolArgs: {
+            productId: targetId || targetQuery,
+            productQuery: targetQuery || cleanSubject,
+            quantity: requestedQty || 1,
+            userPrompt: text
+          }
         };
       }
     }
@@ -5144,7 +5209,7 @@ class PayAIOrchestrator {
           const isLocal = !item.isExternal && item.provider === 'w-commerce';
           const priceDisplay = isLocal ? `₦${Number(item.price).toLocaleString()} NGN` : `$${item.price} USD`;
           const negTag = item.canNegotiate ? '🤝 *Negotiable*' : '🔒 *Fixed Price*';
-          const stockTag = item.inStock ? (item.isLowStock ? `⚠️ Only ${item.stock} left` : `✅ In stock (${item.stock})`) : (item.isExternal ? '✅ Available' : '❌ Out of stock');
+          const stockTag = item.inStock ? (item.stock === 1 ? '⚠️ Only 1 remaining!' : (item.stock <= 5 ? `⚠️ Only ${item.stock} remain in stock` : `✅ In stock (${item.stock})`)) : (item.isExternal ? '✅ Available' : '❌ Finished / Out of stock');
           const sellerName = item.seller?.name || (isLocal ? 'Verified Local Merchant' : `${item.provider?.toUpperCase()} Store`);
           const safeImg = safeImageUrl(item) || item.imageUrl;
           const imgPart = safeImg ? `\n  ![${item.title}](${safeImg})` : '';
@@ -5177,14 +5242,65 @@ class PayAIOrchestrator {
       }
 
       case 'check_product_stock': {
-        if (!result.found) {
-          return `🔍 ${result.reason || 'Product not found.'}`;
+        // Case 1: Product Not Found in W-Commerce Market
+        if (!result.found || result.notFound) {
+          const q = result.query || 'this item';
+          return `🔍 **Product Not Found in W-Commerce Market** 📦\n\n` +
+            `We searched our verified local merchants and could not find **"${q}"** in current W-Commerce market inventory.\n\n` +
+            `### 💡 What You Can Do:\n` +
+            `1. 🔎 **Search Similar Items:** Try searching with a broader keyword (e.g. *"${q.split(' ')[0]}"*) to explore in-stock alternatives.\n` +
+            `2. 🌐 **Import From Any Global Store:** If you find this product on **Amazon, AliExpress, Jumia, or Konga**, simply copy and paste its URL right here into PayAI! We will import it, calculate landed delivery, and protect your payment with W-Commerce Escrow.\n\n` +
+            `[🔍 Browse Available Products](prompt:show all products) ` +
+            `[🌐 How To Import External Links](prompt:how does external store linking work)`;
         }
-        const statusIcon = result.available ? (result.isLowStock ? '⚠️' : '✅') : '❌';
-        const negText = result.canNegotiate ? 'Price negotiation is available for this product 🤝' : 'Fixed price listing 🔒';
+
         const resImg = safeImageUrl(result) || result.imageUrl;
         const imgPart = resImg ? `\n\n![${result.title}](${resImg})` : '';
-        return `${statusIcon} **Real-Time Stock Check: "${result.title}"**\n- **Inventory Status:** ${result.reason}\n- **Current Stock:** ${result.stock} units available\n- **Unit Price:** ₦${result.price?.toLocaleString()} NGN\n- **Negotiation:** ${negText}\n- **Estimated Delivery:** ${result.estimatedDeliveryDays} business days (₦${result.shippingFee?.toLocaleString()} NGN standard shipping)${imgPart}`;
+        const negText = result.canNegotiate ? 'Price negotiation is active 🤝' : 'Fixed price listing 🔒';
+        const priceDisplay = `₦${Number(result.price || 0).toLocaleString()} NGN`;
+        const sellerName = result.seller?.name || 'Verified Merchant';
+
+        // Case 2: Product Finished / Out of Stock
+        if (result.stock === 0 || result.isFinished || !result.available) {
+          return `❌ **Product Finished / Out of Stock: "${result.title}"** 📦🚫\n\n` +
+            `⚠️ This product has **completely finished** and is currently out of stock with verified merchant *${sellerName}* (**0 units remaining in stock**).\n\n` +
+            `- **Seller:** ${sellerName}\n` +
+            `- **Last Listed Price:** ${priceDisplay}\n` +
+            `- **Inventory Status:** ❌ Finished / Sold Out\n` +
+            `- **Restock Alert:** The merchant has been notified to restock this item.${imgPart}\n\n` +
+            `### 💡 Suggested Next Steps:\n` +
+            `• 🔔 Tap **Alert Me When Restocked** to get notified as soon as new units arrive!\n` +
+            `• 🔍 Let me find you similar in-stock alternatives from other verified merchants.\n\n` +
+            `[🔔 Alert Me When Restocked](prompt:notify me when ${result.title} is back in stock) ` +
+            `[🔍 Find Similar In-Stock Items](prompt:find alternatives for ${result.title}) ` +
+            `[🛍️ Browse Marketplace](prompt:show all products)`;
+        }
+
+        // Case 3: Low Stock Urgency Alert (e.g. "only 3 remain in stock")
+        if (result.isLowStock || result.stock <= 5) {
+          const unitWord = result.stock === 1 ? 'unit remains' : 'units remain';
+          return `⚠️ **Low Stock Alert: Only ${result.stock} ${unitWord} in stock!** ⏳🔥\n\n` +
+            `**"${result.title}"** is in high demand, and our live inventory check confirms that **only ${result.stock} ${unitWord} in stock** with verified seller *${sellerName}*.\n\n` +
+            `- **Inventory Status:** ⚠️ Almost Finished (Only ${result.stock} remaining)\n` +
+            `- **Unit Price:** ${priceDisplay}\n` +
+            `- **Estimated Delivery:** ${result.estimatedDeliveryDays || '1-3'} business days (₦${Number(result.shippingFee || 0).toLocaleString()} NGN standard shipping)\n` +
+            `- **Negotiation:** ${negText}${imgPart}\n\n` +
+            `👉 *Hurry and lock in your order before this item finishes!*\n\n` +
+            `[🛒 Add to Cart Now (${priceDisplay})](prompt:add ${result.title} to cart) ` +
+            (result.canNegotiate ? `[🤝 Quick Bargain](prompt:can i get a discount on ${result.title}) ` : '') +
+            `[🚚 Check Shipping](prompt:check shipping for ${result.title})`;
+        }
+
+        // Case 4: Ample In-Stock Available
+        return `✅ **In Stock & Ready for Dispatch: "${result.title}"** 📦✨\n\n` +
+          `Good news! We have **${result.stock} units available in stock** with verified merchant *${sellerName}*.\n\n` +
+          `- **Inventory Status:** ✅ Ample Stock Available (${result.stock} units)\n` +
+          `- **Unit Price:** ${priceDisplay}\n` +
+          `- **Estimated Delivery:** ${result.estimatedDeliveryDays || '1-3'} business days\n` +
+          `- **Negotiation:** ${negText}${imgPart}\n\n` +
+          `[🛒 Add to Cart (${priceDisplay})](prompt:add ${result.title} to cart) ` +
+          (result.canNegotiate ? `[🤝 Make an Offer](prompt:can i get a discount on ${result.title}) ` : '') +
+          `[🚚 Check Shipping](prompt:check shipping for ${result.title})`;
       }
 
       case 'compare_offers': {
@@ -5395,6 +5511,19 @@ class PayAIOrchestrator {
       case 'place_order':
       case 'add_to_cart': {
         if (!result.success) {
+          if (result.isFinished || result.isOutOfStock) {
+            const prod = result.product || {};
+            const pTitle = prod.title || 'This product';
+            const safeImg = safeImageUrl(prod) || prod.imageUrl;
+            const imgPart = safeImg ? `\n\n![${pTitle}](${safeImg})` : '';
+            return `❌ **Product Finished / Out of Stock: "${pTitle}"** 📦🚫\n\n` +
+              `⚠️ We're sorry, but **"${pTitle}"** has completely **finished** and is currently out of stock with the merchant (**0 units remaining in stock**).${imgPart}\n\n` +
+              `### 💡 What You Can Do:\n` +
+              `- 🔔 Tap **Alert Me When Restocked** to get notified as soon as inventory arrives!\n` +
+              `- 🔍 Ask PayAI to find similar in-stock alternatives from verified sellers.\n\n` +
+              `[🔔 Alert Me When Restocked](prompt:notify me when ${pTitle} is restocked) ` +
+              `[🔍 Find Similar Available Items](prompt:find alternatives for ${pTitle})`;
+          }
           return result.message || 'Please specify which product you would like to add to your cart.';
         }
 

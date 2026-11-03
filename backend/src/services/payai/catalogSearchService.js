@@ -632,28 +632,89 @@ class CatalogSearchService {
   /**
    * Real-time stock / inventory and price check for native W-Commerce product
    */
-  async checkProductStock(productId, requestedQuantity = 1) {
-    if (!productId) {
-      return { found: false, available: false, reason: 'Product ID is required' };
+  async checkProductStock(productIdOrQuery, requestedQuantity = 1) {
+    if (!productIdOrQuery) {
+      return {
+        found: false,
+        notFound: true,
+        available: false,
+        stock: 0,
+        reason: 'Product title or ID is required for stock check.'
+      };
     }
 
     try {
-      const product = await prisma.product.findUnique({
-        where: { id: productId },
-        include: { store: true, images: true }
-      });
+      const identifier = String(productIdOrQuery).trim();
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
+
+      let product = null;
+      if (isUuid) {
+        product = await prisma.product.findUnique({
+          where: { id: identifier },
+          include: { store: true, images: true }
+        });
+      }
+
+      // If not UUID or not found by exact ID, search by title in verified marketplace
+      if (!product) {
+        // 1. Exact title match
+        product = await prisma.product.findFirst({
+          where: {
+            isArchived: false,
+            title: { equals: identifier }
+          },
+          include: { store: true, images: true }
+        });
+
+        // 2. Contains match
+        if (!product) {
+          product = await prisma.product.findFirst({
+            where: {
+              isArchived: false,
+              title: { contains: identifier }
+            },
+            include: { store: true, images: true }
+          });
+        }
+
+        // 3. Token match
+        if (!product) {
+          const stopWords = new Set(['the', 'and', 'for', 'with', 'pack', 'this', 'that', 'item', 'product', 'is', 'it', 'any', 'in', 'stock', 'left', 'available', 'finish', 'finished', 'remain', 'remaining']);
+          const tokens = identifier.split(/\s+/).filter(w => w.length >= 3 && !stopWords.has(w.toLowerCase()));
+          if (tokens.length > 0) {
+            product = await prisma.product.findFirst({
+              where: {
+                isArchived: false,
+                AND: tokens.map(t => ({ title: { contains: t } }))
+              },
+              include: { store: true, images: true }
+            });
+          }
+        }
+      }
 
       if (!product) {
-        return { found: false, available: false, reason: 'Product not found in W-Commerce database' };
+        return {
+          found: false,
+          notFound: true,
+          query: identifier,
+          available: false,
+          stock: 0,
+          reason: `Could not find "${identifier}" in W-Commerce market catalog.`
+        };
       }
 
       if (product.isArchived) {
         return {
           found: true,
+          notFound: false,
           productId: product.id,
           title: product.title,
           available: false,
           inStock: false,
+          isFinished: true,
+          isOutOfStock: true,
+          stock: 0,
           currentStock: 0,
           reason: 'This product has been archived or discontinued by the seller'
         };
@@ -661,7 +722,8 @@ class CatalogSearchService {
 
       const reqQty = Math.max(1, Number(requestedQuantity) || 1);
       const stock = Number(product.stock || 0);
-      const inStock = stock >= reqQty;
+      const isFinished = stock === 0;
+      const inStock = stock >= reqQty && !isFinished;
       const lowStockThreshold = Number(product.lowStockThreshold || 5);
       const isLowStock = stock > 0 && stock <= lowStockThreshold;
       const deliveryLeadTime = product.estimatedDeliveryDays
@@ -670,6 +732,7 @@ class CatalogSearchService {
 
       return {
         found: true,
+        notFound: false,
         productId: product.id,
         title: product.title,
         price: Number(product.price),
@@ -679,9 +742,11 @@ class CatalogSearchService {
         requestedQuantity: reqQty,
         available: inStock,
         inStock,
+        isFinished,
+        isOutOfStock: isFinished,
         isLowStock,
         lowStockThreshold,
-        lowStockWarning: isLowStock ? `Warning: Low stock! Only ${stock} items left.` : null,
+        lowStockWarning: isLowStock ? `Warning: Low stock! Only ${stock} remain in stock.` : null,
         shippingFee: Number(product.shippingFee || 0),
         estimatedDeliveryDays: product.estimatedDeliveryDays || 5,
         deliveryLeadTime,
@@ -693,13 +758,15 @@ class CatalogSearchService {
           name: product.store?.storeName || 'Verified Merchant',
           isVerified: Boolean(product.store?.isVerified)
         },
-        reason: inStock
-          ? (isLowStock ? `Only ${stock} left in stock - order soon!` : 'In stock and ready to ship')
-          : (stock === 0 ? 'Currently out of stock' : `Only ${stock} available, less than requested ${reqQty}`)
+        reason: isFinished
+          ? 'Finished / Out of stock (0 units remaining)'
+          : (isLowStock
+            ? `Only ${stock} remain in stock - order soon!`
+            : (inStock ? 'In stock and ready to ship' : `Only ${stock} remain in stock, less than requested ${reqQty}`))
       };
     } catch (err) {
       logger.error(`[CatalogSearchService] checkProductStock error: ${err.message}`);
-      return { found: false, available: false, reason: err.message };
+      return { found: false, notFound: true, available: false, reason: err.message };
     }
   }
 

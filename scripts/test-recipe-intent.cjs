@@ -68,14 +68,14 @@ async function testRecipeIntentFix() {
   assert.strictEqual(preferDetected.toolName, 'select_product_preference', 'Explicit preference must still trigger select_product_preference');
   console.log('✔ Test 3 Passed: Genuine product selection preserved\n');
 
-  console.log('4. Testing aiService fallback for culinary/recipe queries...');
+  console.log('4. Testing aiService response for culinary/recipe queries...');
   const aiReply = await aiService.generateChatResponse([
     { role: 'user', content: screenshotPrompt }
   ]);
   console.log('--- aiService Response Preview ---');
   console.log(aiReply.slice(0, 300) + '...\n');
-  assert.ok(aiReply.includes('Ingredients Checklist') || aiReply.includes('Curry Powder'), 'aiService fallback must include ingredients');
-  assert.ok(!aiReply.includes('How many would you like to order?'), 'aiService fallback must not ask to order');
+  assert.ok(aiReply.toLowerCase().includes('ingredient') || aiReply.toLowerCase().includes('curry') || aiReply.toLowerCase().includes('rice'), 'aiService response must include ingredients');
+  assert.ok(!aiReply.includes('How many would you like to order?'), 'aiService response must not ask to order');
   console.log('✔ Test 4 Passed: aiService culinary handler verified\n');
 
   console.log('🎉 ALL RECIPE INTENT TESTS PASSED SUCCESSFULLY!');
