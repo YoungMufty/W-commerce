@@ -218,6 +218,7 @@ class PayAIOrchestrator {
           'advise_comparison',
           'advise_styling',
           'advise_food',
+          'advise_culinary_recipe',
           'select_product_preference',
           'plan_multi_day_meals_or_budget',
           'plan_budget_goal',
@@ -730,6 +731,67 @@ class PayAIOrchestrator {
           meals,
           drinks,
           userPrompt: prompt
+        };
+      }
+
+      case 'advise_culinary_recipe': {
+        const prompt = toolArgs.prompt || '';
+        const lower = prompt.toLowerCase();
+        let dish = 'fried rice';
+        if (/jollof/i.test(lower)) dish = 'jollof rice';
+        else if (/fried\s*rice/i.test(lower)) dish = 'fried rice';
+        else if (/noodle|indomie|pasta|spaghetti/i.test(lower)) dish = 'noodles';
+        else if (/pancake|waffle|french\s*toast|crepe/i.test(lower)) dish = 'pancakes';
+        else if (/egg|omelet|scrambled/i.test(lower)) dish = 'eggs & omelette';
+        else if (/egusi|soup|stew|okra|efo/i.test(lower)) dish = 'soup & stew';
+        else if (/chicken\s*curry|curry/i.test(lower)) dish = 'chicken curry';
+        else {
+          const dishMatch = lower.match(/(?:prepare|cook|make|recipe\s+for|ingredients\s+for)\s+(?:a\s+|some\s+)?([a-z0-9\s-]+?)(?:\s+for|\s+in|\s+at|\s+with|\.|\?|$)/i);
+          if (dishMatch && dishMatch[1] && dishMatch[1].trim().length >= 3) {
+            dish = dishMatch[1].trim();
+          }
+        }
+
+        // Query available pantry, seasoning and grocery items in W-Commerce catalog
+        let groceryItems = [];
+        try {
+          const rawGroceries = await prisma.product.findMany({
+            where: {
+              isArchived: false,
+              stock: { gt: 0 },
+              OR: [
+                { category: { in: ['Groceries', 'Food', 'Combos', 'Pantry', 'Spices'] } },
+                { title: { contains: 'rice' } },
+                { title: { contains: 'oil' } },
+                { title: { contains: 'curry' } },
+                { title: { contains: 'spice' } },
+                { title: { contains: 'seasoning' } },
+                { title: { contains: 'vegetable' } }
+              ]
+            },
+            include: { store: { select: { storeName: true, isVerified: true } }, images: true },
+            take: 4,
+            orderBy: { createdAt: 'desc' }
+          });
+          groceryItems = rawGroceries.map(p => ({
+            id: p.id,
+            productId: p.id,
+            title: p.title,
+            price: Number(p.price),
+            currency: 'NGN',
+            category: p.category,
+            seller: { name: p.store?.storeName || 'Verified Merchant' },
+            imageUrl: resolveBackendProductImage(p),
+            canNegotiate: true
+          }));
+        } catch (_) {}
+
+        return {
+          success: true,
+          isCulinaryRecipe: true,
+          dish,
+          userPrompt: prompt,
+          groceryItems
         };
       }
 
@@ -3812,6 +3874,16 @@ class PayAIOrchestrator {
       };
     }
 
+    // 1.458. Recipe, Culinary, Ingredients & Home Cooking Consultation
+    // e.g. "I have rice in my kitchen, list out all ingredient i need to get fried rice prepare for my breakfast", "how to cook jollof rice", "recipe for egusi soup"
+    const culinaryRecipePatterns = /\b(?:recipe|recipes|ingredient|ingredients|how\s+(?:to|do\s+i|can\s+i)s+(?:cook|prepare|make|fry|bake)|list\s+(?:out\s+)?(?:all\s+)?(?:the\s+)?ingredients?|what\s+ingredients?|in\s+my\s+kitchen|in\s+my\s+fridge|in\s+my\s+pantry|cook\s+(?:at\s+home|for\s+(?:breakfast|lunch|dinner|myself))|steps\s+to\s+(?:prepare|cook|make)|how\s+is\s+.+?\s+(?:prepared|cooked|made)|guide\s+to\s+(?:cook|prepare|make))\b/i;
+    if (culinaryRecipePatterns.test(lower)) {
+      return {
+        toolName: 'advise_culinary_recipe',
+        toolArgs: { prompt: text }
+      };
+    }
+
     // 1.47. Response to Active Negotiation / Bundle Offer / Quantity Request for Current Product
     // Examples: "I want 2 hungry bee", "I want 2", "buy 2", "give me 2", "2 hungry bee", "two please", "accept bundle", "lock deal", "deal", "i'll take 2", "i want 1 hungry bee"
     const acceptOfferPatterns = /\b(i\s+accept|accept\s+offer|deal|i'll\s+take\s+it|i\s+will\s+take\s+it|lock\s+(?:the\s+)?offer|lock\s+(?:the\s+)?deal|accept\s+2-item\s+bundle|accept\s+bundle|2-item\s+bundle|buy\s+two)\b/i;
@@ -3863,6 +3935,7 @@ class PayAIOrchestrator {
     // "let's go with hungry box meal", "i want the hungry box meal", "i prefer the first one", "option 1 sounds good"
     const isNotCartOrAction = !contextData?.actionType &&
       !contextData?.proposedPrice &&
+      !culinaryRecipePatterns.test(lower) &&
       !/\b(add\s+to\s+cart|put\s+in\s+cart|into\s+my\s+cart|to\s+my\s+cart|checkout|track|return|warehouse|photo|video|voice\s*note|discount|negotiat|make\s+(?:an\s+)?offer|can\s+you\s+do|compare|connected\s+stores|other\s+stores|other\s+sellers|cheaper\s+alternative|elsewhere|alert\s+me|notify\s+me|save\s+(?:this\s+)?product)\b/i.test(lower);
 
     if (isNotCartOrAction) {
@@ -3877,7 +3950,8 @@ class PayAIOrchestrator {
       let matchedIndex = -1;
 
       // 1. Check title matching against prevItems FIRST (so "hungry bee" matches Hungry Bee Meal even if preceded by a quantity like "2")
-      if (prevItems.length > 0) {
+      const isQuestionOrInquiry = /^(?:what|how|why|can\s+you|could\s+you|tell\s+me|list|where|is\s+there|do\s+you)\b/i.test(lower.trim()) || lower.includes('?');
+      if (prevItems.length > 0 && (!isQuestionOrInquiry || hasPreferenceKeyword)) {
         for (let i = 0; i < prevItems.length; i++) {
           const it = prevItems[i];
           const itTitle = (it.title || '').toLowerCase().trim();
@@ -3898,7 +3972,8 @@ class PayAIOrchestrator {
           const titleWords = cleanItTitle.split(' ').filter(w => w.length >= 3);
           if (titleWords.length >= 2) {
             const firstTwo = titleWords.slice(0, 2).join(' ');
-            if (cleanPrompt.includes(firstTwo)) {
+            // Only match multi-word prefix if user explicitly expresses preference or prompt is a concise product mention
+            if (cleanPrompt.includes(firstTwo) && (hasPreferenceKeyword || cleanPrompt.length <= 35 || isPureQuantityReply)) {
               matchedProduct = it;
               matchedIndex = i;
               break;
@@ -4889,6 +4964,132 @@ class PayAIOrchestrator {
         }
 
         reply += `Are you craving spicy crunch, a juicy beef burger, or a lighter quick snack? Tell me your vibe and let's get it delivered piping hot! 🚀`;
+        return reply;
+      }
+
+      case 'advise_culinary_recipe': {
+        const dish = (result.dish || 'fried rice').toLowerCase();
+        const groceries = result.groceryItems || [];
+        const isBreakfast = /breakfast|morning/i.test(originalPrompt || '');
+        const occasion = isBreakfast ? 'breakfast' : 'meal';
+
+        let header = '';
+        let ingredientsList = '';
+        let prepSteps = '';
+
+        if (dish.includes('fried rice')) {
+          header = `🍳 **Delicious ${isBreakfast ? 'Breakfast' : 'Culinary'} Choice! Nigerian / Classic Fried Rice** 🍚✨\n\n` +
+            `Since you already have **rice** in your kitchen, you're halfway there! Homemade fried rice is savory, colorful, and super easy to prepare. Here is the full list of ingredients you need and a quick, foolproof step-by-step preparation guide:\n\n`;
+
+          ingredientsList =
+            `### 🥘 Essential Ingredients Checklist:\n` +
+            `1. 🍚 **Rice Base (Already in your kitchen!):**\n` +
+            `   • 2 cups parboiled long-grain white rice (cooked and cooled or leftover chilled rice works best so grains stay firm and separate).\n` +
+            `2. 🥕 **Fresh Vegetables & Aromatics:**\n` +
+            `   • **Carrots:** 2 medium (peeled and finely diced)\n` +
+            `   • **Green Peas & Sweet Corn:** ½ cup each\n` +
+            `   • **Green Bell Pepper:** 1 medium (finely diced)\n` +
+            `   • **Onions:** 1 medium (finely chopped)\n` +
+            `   • **Spring Onions (Scallions):** 2 stalks (sliced for the final fresh finish)\n` +
+            `   • **Garlic & Ginger:** 2 cloves garlic + ½ tsp grated ginger (finely minced)\n` +
+            `3. 🧂 **Spices & Seasoning (For signature golden color and aroma):**\n` +
+            `   • **Curry Powder:** 1 to 1½ tablespoons (gives fried rice its vibrant golden-yellow color and warm aroma)\n` +
+            `   • **Dried Thyme:** 1 teaspoon\n` +
+            `   • **Seasoning Cubes:** 2 chicken or beef bouillon cubes (e.g. Knorr / Maggi)\n` +
+            `   • **White or Black Pepper:** ½ teaspoon\n` +
+            `   • **Salt:** To taste\n` +
+            `4. 🍗 **Proteins (Optional but recommended):**\n` +
+            `   • Diced cooked beef liver, shredded chicken, or small shrimp\n` +
+            `5. 🫒 **Cooking Oil:**\n` +
+            `   • 2 to 3 tablespoons vegetable oil or butter for stir-frying\n\n`;
+
+          prepSteps =
+            `### ⚡ 4-Step Quick Preparation (Ready in 15 Minutes):\n` +
+            `1. **Prep Veggies:** Dice carrots, green pepper, and onions into small, uniform cubes so they cook evenly.\n` +
+            `2. **Bloom Aromatics:** Heat 2-3 tablespoons of oil in a wide frying pan or wok on medium heat. Sauté the chopped onions, garlic, and ginger for 1 minute until fragrant.\n` +
+            `3. **Toss Veggies & Spices:** Stir in curry powder and dried thyme into the hot oil. Add the diced carrots, sweet corn, green peas, and protein. Stir-fry for 2 minutes (keep the veggies vibrant and slightly crunchy!).\n` +
+            `4. **Stir-Fry Rice & Finish:** Add the cooked rice in batches. Crumble in the seasoning cubes, add a pinch of salt and white pepper, and stir-fry vigorously on medium-high heat for 3 to 5 minutes until every grain is steaming and golden. Fold in sliced spring onions, turn off heat, and serve hot! 🍽️🔥\n\n`;
+        } else if (dish.includes('jollof')) {
+          header = `🍲 **Classic Jollof Rice Recipe & Ingredient Breakdown** 🍅✨\n\n` +
+            `Jollof rice is legendary! Since you have rice in your kitchen, here is what you need to create rich, smoky party-style Jollof rice:\n\n`;
+
+          ingredientsList =
+            `### 🥘 Essential Ingredients Checklist:\n` +
+            `1. 🍚 **Rice Base:** 2-3 cups long-grain parboiled rice (washed and drained).\n` +
+            `2. 🍅 **Tomato-Pepper Blend (The Base):**\n` +
+            `   • 4 fresh plum tomatoes, 2 red bell peppers (tatashe), 2 scotch bonnets (ata rodo), and 1 onion — blended smooth.\n` +
+            `   • 3-4 tablespoons thick tomato paste (for deep rich red color).\n` +
+            `3. 🧅 **Aromatics & Spices:**\n` +
+            `   • 1 chopped onion, 2 bay leaves, 1 tbsp curry powder, 1 tsp dried thyme, 2-3 seasoning cubes, salt, and white pepper.\n` +
+            `4. 🍗 **Stock & Cooking Oil:**\n` +
+            `   • Rich chicken or beef broth/stock (adds immense depth).\n` +
+            `   • ¼ cup vegetable oil.\n\n`;
+
+          prepSteps =
+            `### ⚡ 4-Step Preparation:\n` +
+            `1. **Fry Base:** Heat oil, sauté sliced onions, and fry the tomato paste for 5 minutes until oil shines on top.\n` +
+            `2. **Cook Sauce:** Pour in the blended pepper mix, bay leaves, curry, thyme, and seasoning cubes. Simmer for 15-20 minutes until oil separates.\n` +
+            `3. **Combine with Stock:** Pour in chicken stock, bring to a rolling boil, and adjust salt to taste.\n` +
+            `4. **Steam the Rice:** Add the rinsed rice. Cover tightly with foil and lid. Cook on low heat for 30 minutes so the steam cooks the rice evenly without burning. Fluff and serve! 🍛✨\n\n`;
+        } else if (dish.includes('noodle') || dish.includes('indomie')) {
+          header = `🍜 **Elevated Quick Breakfast Noodles Recipe** 🍳✨\n\n` +
+            `Quick, comforting, and packed with flavor! Here is how to make an elevated breakfast noodle dish:\n\n`;
+
+          ingredientsList =
+            `### 🥘 Ingredients Checklist:\n` +
+            `• 1-2 packs instant noodles with spice sachets\n` +
+            `• 1-2 eggs (boiled, fried sunny-side up, or scrambled into the noodles)\n` +
+            `• 1 small onion & 1 fresh scotch bonnet pepper (ata rodo), sliced\n` +
+            `• Handful of diced carrots & green peas\n` +
+            `• 1 tablespoon vegetable oil or butter\n\n`;
+
+          prepSteps =
+            `### ⚡ 3-Step Preparation:\n` +
+            `1. Sauté sliced onions and peppers in 1 tbsp oil for 1 minute.\n` +
+            `2. Add 1 cup of water, bring to a boil, then add the noodle seasonings and veggies.\n` +
+            `3. Drop in noodles, simmer for 3 minutes until tender, and top with your egg! 🥢🍳\n\n`;
+        } else {
+          header = `👨‍🍳 **PayAI Culinary Guide & Ingredient Breakdown for ${dish.charAt(0).toUpperCase() + dish.slice(1)}** 🥘✨\n\n` +
+            `Here are the complete ingredients and preparation steps to cook delicious homemade **${dish}** for your ${occasion}:\n\n`;
+
+          ingredientsList =
+            `### 🥘 Ingredients Checklist:\n` +
+            `• **Primary Base & Proteins:** Main staple ingredients and fresh protein choices.\n` +
+            `• **Fresh Aromatics:** Onions, garlic, ginger, and fresh peppers.\n` +
+            `• **Spices & Seasonings:** Curry powder, dried thyme, bouillon cubes, and sea salt.\n` +
+            `• **Cooking Medium:** Vegetable oil or butter for cooking.\n\n`;
+
+          prepSteps =
+            `### ⚡ Quick Preparation Guide:\n` +
+            `1. Prep all ingredients and dice aromatics uniformly.\n` +
+            `2. Heat oil, bloom spices and sauté aromatics until fragrant.\n` +
+            `3. Add seasonings and cook the primary base until tender and rich.\n` +
+            `4. Adjust seasoning, garnish with fresh herbs, and serve hot!\n\n`;
+        }
+
+        let reply = `${header}${ingredientsList}${prepSteps}`;
+
+        // Marketplace cross-sell: Helpful grocery & pantry support (NOT forcing a cooked meal)
+        reply +=
+          `### 💡 Need Spices, Cooking Oil, or Fresh Groceries?\n` +
+          `You already have the rice! If you are missing curry powder, dried thyme, cooking oil, or fresh ingredients in your pantry, verified local merchants on W-Commerce have you covered with fast doorstep delivery.\n\n`;
+
+        if (groceries.length > 0) {
+          groceries.slice(0, 2).forEach(g => {
+            const gPrice = `₦${Number(g.price || 0).toLocaleString()} NGN`;
+            const gImg = g.imageUrl ? `\n![${g.title}](${g.imageUrl})` : '';
+            reply += `• **${g.title}** — **${gPrice}** (${g.seller?.name || 'Verified Grocery Seller'})${gImg}\n`;
+          });
+          reply += '\n';
+        }
+
+        reply +=
+          `💡 **Quick Actions:**\n` +
+          `- [🔍 Search Curry Powder & Spices](prompt:search curry powder and spices)\n` +
+          `- [🫒 Search Cooking Oil](prompt:search cooking oil)\n` +
+          `- [🥕 Browse Fresh Groceries](prompt:search groceries)\n` +
+          `- [🍗 Prefer Ready-Made? Order Prepared Fried Rice](prompt:find fried rice and chicken meal)`;
+
         return reply;
       }
 

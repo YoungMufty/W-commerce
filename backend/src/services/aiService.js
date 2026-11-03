@@ -278,6 +278,54 @@ async function handleStylingAdvice(lower, lastMsg) {
 /**
  * Intelligent Food, Dining & Hunger Consultation
  */
+function handleRecipeAdvice(lower, lastMsg) {
+    const isBreakfast = /breakfast|morning/i.test(lower);
+    if (lower.includes('fried rice') || lower.includes('rice')) {
+        return "🍳 **Delicious " + (isBreakfast ? "Breakfast" : "Culinary") + " Choice! Nigerian / Classic Fried Rice** 🍚✨\n\n" +
+            "Since you already have **rice** in your kitchen, you are halfway there! Here is the complete ingredients checklist and quick step-by-step preparation guide:\n\n" +
+            "### 🥘 Essential Ingredients Checklist:\n" +
+            "1. 🍚 **Rice Base (Already in your kitchen!):**\n" +
+            "   • 2 cups parboiled white rice (cooked and chilled or leftover rice works best so grains stay separate).\n" +
+            "2. 🥕 **Fresh Vegetables & Aromatics:**\n" +
+            "   • **Carrots:** 2 medium (peeled and diced finely)\n" +
+            "   • **Green Peas & Sweet Corn:** ½ cup each\n" +
+            "   • **Green Bell Pepper:** 1 medium (diced)\n" +
+            "   • **Onions:** 1 medium (chopped)\n" +
+            "   • **Spring Onions (Scallions):** 2 stalks (sliced)\n" +
+            "   • **Garlic & Ginger:** 2 cloves garlic + ½ tsp grated ginger (minced)\n" +
+            "3. 🧂 **Spices & Seasoning (Essential for golden color & savory taste):**\n" +
+            "   • **Curry Powder:** 1 to 1½ tablespoons (gives classic golden-yellow color and warm aroma)\n" +
+            "   • **Dried Thyme:** 1 teaspoon\n" +
+            "   • **Seasoning Cubes:** 2 chicken or beef bouillon cubes (Knorr/Maggi)\n" +
+            "   • **White or Black Pepper:** ½ teaspoon\n" +
+            "   • **Salt:** To taste\n" +
+            "4. 🍗 **Proteins (Optional):**\n" +
+            "   • Diced cooked beef liver, shredded chicken, or small shrimp\n" +
+            "5. 🫒 **Cooking Oil:**\n" +
+            "   • 2 to 3 tablespoons vegetable oil or butter for stir-frying\n\n" +
+            "### ⚡ 4-Step Quick Preparation (Ready in 15 Minutes):\n" +
+            "1. **Prep Veggies:** Dice carrots, green pepper, and onions into small, uniform cubes.\n" +
+            "2. **Bloom Spices:** Heat oil in a wok or wide pan on medium heat. Sauté onions, garlic, and ginger with curry powder and thyme for 1 minute until fragrant.\n" +
+            "3. **Toss Veggies & Protein:** Add diced carrots, sweet corn, green peas, and protein. Stir-fry for 2 minutes to keep them crisp and colorful.\n" +
+            "4. **Stir-Fry Rice & Finish:** Add cooked rice and seasoning cubes. Stir-fry on medium-high heat for 3 to 5 minutes until piping hot and golden. Toss in spring onions and serve! 🍽️🔥\n\n" +
+            "### 💡 Need Spices, Cooking Oil, or Fresh Groceries?\n" +
+            "You already have the rice! If you need curry powder, seasoning cubes, cooking oil, or fresh veggies, verified local merchants on W-Commerce can deliver them right away.\n\n" +
+            "💡 **Quick Actions:**\n" +
+            "- [🔍 Search Curry Powder & Spices](prompt:search curry powder and spices)\n" +
+            "- [🫒 Search Cooking Oil](prompt:search cooking oil)\n" +
+            "- [🥕 Browse Fresh Groceries](prompt:search groceries)\n" +
+            "- [🍗 Prefer Ready-Made? Order Prepared Fried Rice](prompt:find fried rice and chicken meal)";
+    }
+
+    return "👨‍🍳 **PayAI Culinary Guide & Ingredient Breakdown** 🥘✨\n\n" +
+        "Here are the core ingredients and instructions to prepare your meal:\n\n" +
+        "• **Base & Proteins:** Fresh meats, fish, eggs, or staple grains.\n" +
+        "• **Fresh Aromatics:** Onions, garlic, ginger, and fresh peppers.\n" +
+        "• **Seasoning & Spices:** Curry powder, dried thyme, seasoning cubes, and salt.\n" +
+        "• **Cooking Medium:** Vegetable oil or butter.\n\n" +
+        "Need fresh ingredients delivered? Search verified local grocery sellers on W-Commerce! 🛒";
+}
+
 async function handleFoodAdvice(lower, lastMsg, budget) {
     let reply = `🍔😋 **PayAI Chef's Table & Meal Recommendations** 🍟🥤\n\n` +
         `Ready for something delicious, crispy, and thoroughly satisfying? Here are our top-rated marketplace meals prepared fresh:\n\n`;
@@ -522,6 +570,14 @@ async function buildIntelligentReply(lastMsg = '', liveContext = '', options = {
 
     if (isStylingIntent) {
         return await handleStylingAdvice(lower, lastMsg);
+    }
+
+    // 7.4. Recipe, Ingredients & Cooking Consultation (Home preparation & culinary advice)
+    const isRecipeIntent =
+        /\b(?:recipe|recipes|ingredient|ingredients|how\s+(?:to|do\s+i|can\s+i)s+(?:cook|prepare|make|fry|bake)|list\s+(?:out\s+)?(?:all\s+)?(?:the\s+)?ingredients?|what\s+ingredients?|in\s+my\s+kitchen|in\s+my\s+fridge|in\s+my\s+pantry|cook\s+(?:at\s+home|for\s+(?:breakfast|lunch|dinner|myself))|steps\s+to\s+(?:prepare|cook|make)|how\s+is\s+.+?\s+(?:prepared|cooked|made)|guide\s+to\s+(?:cook|prepare|make))\b/i.test(lower);
+
+    if (isRecipeIntent) {
+        return handleRecipeAdvice(lower, lastMsg);
     }
 
     // 7. Food, Dining & Hunger Consultation
@@ -803,6 +859,7 @@ function buildGeminiPayload(messages, liveContext, isJsonPrompt = false) {
         '  * Real interactive product cards and buttons ("Add to Cart", "Negotiate", "View Cart & Checkout") are automatically rendered beneath your message in the PayAI UI.',
         '  * PRODUCT IMAGES RULE: When introducing, listing, or recommending products to the user, you MUST include the product\'s image using markdown syntax: `![Product Title](ImageUrl)`. Place the image prominently with each product\'s title, price, and merchant so the buyer can visually see each item.',
         '  * SMART SUGGESTIONS & PERFECT PAIRINGS RULE: Whenever listing products or addressing buyer needs, ALWAYS include a dedicated, friendly, entertaining section below titled `### 💡 PayAI Smart Suggestions & Perfect Pairings`. Provide combo pairings (e.g. burger/sushi + chilled softdrink with total combo price), fashion outfit matching (e.g. trousers matching shirts/polos, shoe pairings, referencing past purchases), and tech matching (e.g. iPhone matching protective pouch color, watch straps), accompanied by 1-click suggestion prompt buttons like `[🥤 Add Cold Sprite (₦1,000)](prompt:add Sprite to cart)` or `[✨ Add Both as Combo (₦5,500)](prompt:add Original Crunch and Sprite to cart)`.',
+        '- CULINARY, RECIPE & INGREDIENT INQUIRIES RULE: When a buyer asks for a recipe, cooking instructions, how to prepare food at home, or ingredients (e.g. "I have rice in my kitchen, list out all ingredient i need to get fried rice prepare for my breakfast"):\n  * NEVER force or assume a restaurant/prepared meal order (e.g. NEVER ask "How many would you like to order?").\n  * Directly provide the full culinary breakdown, ingredient list, and easy cooking steps.\n  * Only offer raw pantry/grocery ingredients (cooking oil, spices, seasoning cubes) from the marketplace as optional convenience.',
         '- PERSONALITY & COMMUNICATION STYLE:',
         '  * Maintain a friendly, witty, approachable, and emoji-accented tone (✨, 🎉, 🚀, 🤝, 💸, 🛒, 🥳, 💡, 🏷️, 📦)!',
         '  * Make shopping feel thrilling and delightful! Use natural conversational banter, enthusiastic encouragement, and cheerful wit when browsing, recommending, or negotiating deals.',
