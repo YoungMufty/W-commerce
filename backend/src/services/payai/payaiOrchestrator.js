@@ -4016,7 +4016,9 @@ class PayAIOrchestrator {
 
       // 1. Check title matching against prevItems FIRST (so "hungry bee" matches Hungry Bee Meal even if preceded by a quantity like "2")
       const isQuestionOrInquiry = /^(?:what|how|why|can\s+you|could\s+you|tell\s+me|list|where|is\s+there|do\s+you)\b/i.test(lower.trim()) || lower.includes('?');
-      if (prevItems.length > 0 && (!isQuestionOrInquiry || hasPreferenceKeyword)) {
+      const isCulinaryQuery = culinaryRecipePatterns.test(lower);
+      // Never match session products when user is asking for cooking advice / recipe
+      if (prevItems.length > 0 && (!isQuestionOrInquiry || hasPreferenceKeyword) && !isCulinaryQuery) {
         for (let i = 0; i < prevItems.length; i++) {
           const it = prevItems[i];
           const itTitle = (it.title || '').toLowerCase().trim();
@@ -4026,8 +4028,8 @@ class PayAIOrchestrator {
           const cleanItTitle = itTitle.replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
           const cleanPrompt = lower.replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
 
-          // If prompt contains the product title (e.g. "hungry box meal" or "hungry bee")
-          if (cleanPrompt.includes(cleanItTitle) || (cleanItTitle.length >= 6 && cleanPrompt.includes(cleanItTitle.slice(0, 10)))) {
+          // If prompt contains the FULL product title (exact substring match only - no loose prefix)
+          if (cleanPrompt.includes(cleanItTitle)) {
             matchedProduct = it;
             matchedIndex = i;
             break;
