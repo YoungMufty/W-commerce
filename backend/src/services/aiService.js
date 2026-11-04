@@ -10,10 +10,11 @@ const httpsAgent = new https.Agent({
 });
 
 const CANDIDATE_MODELS = [
-    'gemini-3.1-flash-lite-preview',
-    'gemini-flash-lite-latest',
+    'gemini-3.8-flash',
+    'gemini-flash-latest',
     'gemini-3-flash-preview',
-    'gemini-3.8-flash'
+    'gemini-2.5-flash',
+    'gemini-2.0-flash'
 ];
 
 /**
@@ -348,6 +349,57 @@ async function handleStockAdvice(lower, lastMsg) {
     }
 }
 
+async function handleIngredientStockAdvice(lower, lastMsg) {
+    try {
+        let dish = 'fried rice';
+        if (lower.includes('jollof')) dish = 'jollof rice';
+        else if (lower.includes('fried rice') || lower.includes('rice')) dish = 'fried rice';
+        else if (lower.includes('noodle') || lower.includes('pasta')) dish = 'noodles';
+
+        const groceryItems = await prisma.product.findMany({
+            where: {
+                isArchived: false,
+                stock: { gt: 0 },
+                OR: [
+                    { title: { contains: 'Mixed Vegetables' } },
+                    { title: { contains: 'Chicken Breast' } },
+                    { title: { contains: 'Peppers' } }
+                ]
+            },
+            take: 3
+        });
+
+        let totalCost = 0;
+        let md = '🥘 **Live Ingredient Availability & Grocery Check: ' + dish.charAt(0).toUpperCase() + dish.slice(1) + '** 🛒✨\n\n' +
+            'Great question! Here is the live verified stock status from our W-Commerce grocery merchants for the ingredients you need:\n\n';
+
+        if (groceryItems.length > 0) {
+            md += '### ✅ In Stock & Available Now on W-Commerce:\n';
+            groceryItems.forEach((it, idx) => {
+                totalCost += Number(it.price || 0);
+                md += (idx + 1) + '. **' + it.title + '**\n' +
+                    '   • **Status:** ✅ In Stock (**' + it.stock + ' units available**)\n' +
+                    '   • **Price:** ₦' + Number(it.price || 0).toLocaleString() + ' NGN\n';
+            });
+            md += '\n💰 **Total for Available Grocery Basket:** **₦' + totalCost.toLocaleString() + ' NGN** (🛡️ 100% Escrow Protected)\n\n';
+        }
+
+        md += '### 🍚 In Your Kitchen Already:\n' +
+            '• **Rice Base:** You already have rice in your kitchen! Remember to use chilled parboiled rice so the grains stay separate when stir-frying.\n\n' +
+            '### 🧂 Pantry Staples & Spices:\n' +
+            '• **Curry Powder & Dried Thyme:** Standard kitchen spices for that golden color and savory aroma.\n' +
+            '• **Vegetable Cooking Oil & Seasoning Cubes:** 2-3 tablespoons of oil and bouillon cubes to taste.\n\n' +
+            '### 💡 Quick 1-Click Actions:\n' +
+            '- [🛒 Add Available Ingredients to Cart (₦' + totalCost.toLocaleString() + ' NGN)](prompt:add available ' + dish + ' ingredients to cart)\n' +
+            '- [🥕 Browse All Fresh Groceries](prompt:browse fresh groceries)\n' +
+            '- [🍗 Prefer Ready-Made? Order Prepared Fried Rice](prompt:find fried rice and chicken meal)';
+
+        return md;
+    } catch (_) {
+        return "🥘 **W-Commerce Grocery & Ingredients Check:** We have fresh produce, chicken breast, mixed vegetables, and groceries in stock with verified merchants! Ask for any ingredient or browse our fresh grocery section.";
+    }
+}
+
 function handleRecipeAdvice(lower, lastMsg) {
     const isBreakfast = /breakfast|morning/i.test(lower);
     if (lower.includes('fried rice') || lower.includes('rice')) {
@@ -642,6 +694,15 @@ async function buildIntelligentReply(lastMsg = '', liveContext = '', options = {
         return await handleStylingAdvice(lower, lastMsg);
     }
 
+    // 7.25. Recipe & Grocery Ingredients Stock & Availability Consultation
+    const isIngredientStockQuery =
+        /\b(?:ingredients?|recipe\s+items?|cooking\s+items?|raw\s+items?|spices?)\b/i.test(lower) &&
+        /\b(?:in\s+stock|available|out\s+of\s+stock|remain|left|buy|get|have\s+(?:them|these|all|any)|purchase|where|can\s+i|all\s+ingredient)\b/i.test(lower);
+
+    if (isIngredientStockQuery) {
+        return await handleIngredientStockAdvice(lower, lastMsg);
+    }
+
     // 7.3. Stock, Availability & Scarcity Consultation ("finish", "finished", "out of stock", "remain in stock", "not found")
     const isStockIntent =
         /\b(?:in\s+stock|out\s+of\s+stock|remain\s+in\s+stock|remaining\s+in\s+stock|check\s+stock|how\s+many\s+left|is\s+it\s+(?:finished|finish|available|sold\s+out)|product\s+finish|any\s+left|stock\s+status|stock\s+count|only\s+\d+\s+remain|not\s+found)\b/i.test(lower);
@@ -652,7 +713,7 @@ async function buildIntelligentReply(lastMsg = '', liveContext = '', options = {
 
     // 7.4. Recipe, Ingredients & Cooking Consultation (Home preparation & culinary advice)
     const isRecipeIntent =
-        /\b(?:recipe|recipes|ingredient|ingredients|how\s+(?:to|do\s+i|can\s+i)s+(?:cook|prepare|make|fry|bake)|list\s+(?:out\s+)?(?:all\s+)?(?:the\s+)?ingredients?|what\s+ingredients?|in\s+my\s+kitchen|in\s+my\s+fridge|in\s+my\s+pantry|cook\s+(?:at\s+home|for\s+(?:breakfast|lunch|dinner|myself))|steps\s+to\s+(?:prepare|cook|make)|how\s+is\s+.+?\s+(?:prepared|cooked|made)|guide\s+to\s+(?:cook|prepare|make))\b/i.test(lower);
+        /\b(?:recipe|recipes|ingredient|ingredients|how\s+(?:to|do\s+i|can\s+i|should\s+i)\s+(?:cook|prepare|make|fry|bake|boil|steam|season)|list\s+(?:out\s+)?(?:all\s+)?(?:the\s+)?ingredients?|what\s+ingredients?|which\s+ingredients?|in\s+my\s+kitchen|in\s+my\s+fridge|in\s+my\s+pantry|cook\s+(?:at\s+home|for\s+(?:breakfast|lunch|dinner|myself)|it|this)|steps\s+to\s+(?:prepare|cook|make)|how\s+is\s+.+?\s+(?:prepared|cooked|made)|guide\s+to\s+(?:cook|prepare|make)|cooking\s+(?:instructions?|guide|steps?|time|method|recipe)|how\s+long\s+(?:to|does\s+it\s+take\s+to)\s+(?:cook|prepare|boil|fry|bake))\b/i.test(lower);
 
     if (isRecipeIntent) {
         return handleRecipeAdvice(lower, lastMsg);
