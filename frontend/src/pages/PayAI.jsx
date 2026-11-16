@@ -1026,6 +1026,13 @@ export default function PayAI() {
   const [expandedStoreDropdownId, setExpandedStoreDropdownId] = useState(null);
   const storeScrollContainerRef = useRef(null);
 
+  const openStorePortfolio = useCallback((store) => {
+    if (!store) return;
+    const slug = store.portfolioSlug || (store.storeName ? store.storeName.toLowerCase().replace(/[^a-z0-9]+/g, '-') : store.storeId || store.id);
+    const linkParam = store.linkId ? `?linkId=${encodeURIComponent(store.linkId)}` : '';
+    window.open(`/store/${slug}${linkParam}`, '_blank');
+  }, []);
+
   const [hoveredPreviewProduct, setHoveredPreviewProduct] = useState(null);
 
   const scrollStores = (direction) => {
@@ -4768,11 +4775,8 @@ export default function PayAI() {
                               whileHover={{ scale: 1.1, rotate: 2 }}
                               transition={{ type: 'spring', stiffness: 400, damping: 20 }}
                               className="w-16 h-16 sm:w-18 sm:h-18 rounded-full p-[2.5px] bg-gradient-to-tr from-[#4285F4] via-[#9B72CB] via-[#D96570] to-[#00D2FF] shadow-[0_0_18px_rgba(155,114,203,0.5),0_0_30px_rgba(66,133,244,0.35)] flex items-center justify-center shrink-0 cursor-pointer relative group/avatar"
-                              onClick={() => {
-                                setSelectedExternalStore(store);
-                                setIsStoreShowcaseOpen(true);
-                              }}
-                              title={`Open ${store.storeName} Showcase`}
+                              onClick={() => openStorePortfolio(store)}
+                              title={`Open ${store.storeName} Portfolio in new tab`}
                             >
                               {/* Gemini Rainbow Aura Glow */}
                               <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#4285F4] via-[#9B72CB] via-[#D96570] to-[#00D2FF] blur-md opacity-60 group-hover/avatar:opacity-100 transition-opacity" />
@@ -4789,12 +4793,9 @@ export default function PayAI() {
                             <div>
                               <div className="flex items-center justify-center gap-1 mb-0.5">
                                 <h3
-                                  onClick={() => {
-                                    setSelectedExternalStore(store);
-                                    setIsStoreShowcaseOpen(true);
-                                  }}
+                                  onClick={() => openStorePortfolio(store)}
                                   className="font-black text-[var(--text-main)] text-xs sm:text-sm truncate cursor-pointer hover:text-[#006cff] transition-colors"
-                                  title={store.storeName}
+                                  title={`Open ${store.storeName} Portfolio in new tab`}
                                 >
                                   {store.storeName}
                                 </h3>
@@ -4881,12 +4882,9 @@ export default function PayAI() {
                                               whileTap={{ scale: 0.98 }}
                                               onMouseEnter={() => setHoveredPreviewProduct(prod)}
                                               onMouseLeave={() => setHoveredPreviewProduct(null)}
-                                              onClick={() => {
-                                                setSelectedExternalStore(store);
-                                                setIsStoreShowcaseOpen(true);
-                                              }}
+                                              onClick={() => openStorePortfolio(store)}
                                               className="p-2 sm:p-2.5 rounded-2xl bg-slate-50/80 dark:bg-zinc-800/50 hover:bg-blue-50/60 dark:hover:bg-zinc-800 border-none flex items-center gap-3 transition-all cursor-pointer group/prod relative"
-                                              title={`View "${decodeHtml(prod.title)}" in Store Showcase`}
+                                              title={`View "${decodeHtml(prod.title)}" in Store Portfolio (Opens in new tab)`}
                                             >
                                               {/* Circular Thumbnail - 2X SIZE (w-18 h-18 sm:w-20 sm:h-20) with Gemini Rainbow 🌈 Light Design */}
                                               <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-full p-[2.5px] bg-gradient-to-tr from-[#4285F4] via-[#9B72CB] via-[#D96570] to-[#00D2FF] shadow-[0_0_14px_rgba(155,114,203,0.45)] shrink-0 flex items-center justify-center relative group-hover/prod:shadow-[0_0_22px_rgba(66,133,244,0.7)] group-hover/prod:scale-105 transition-all">
@@ -4945,14 +4943,13 @@ export default function PayAI() {
                             <div className="pt-2.5 flex items-center gap-1.5 sm:gap-2 mt-auto">
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setSelectedExternalStore(store);
-                                  setIsStoreShowcaseOpen(true);
-                                }}
+                                onClick={() => openStorePortfolio(store)}
                                 className="flex-1 py-2 px-3 rounded-xl bg-[#006cff] hover:bg-[#0057d9] text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-[0_4px_12px_rgba(0,108,255,0.25)] truncate border-none"
+                                title={`Open ${store.storeName} Portfolio in new tab`}
                               >
                                 <Store size={13} className="shrink-0" />
                                 <span className="truncate">Explore</span>
+                                <ExternalLink size={11} className="shrink-0 opacity-80" />
                               </button>
 
                               <a

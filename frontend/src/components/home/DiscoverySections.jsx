@@ -101,6 +101,8 @@ export function StoresNearYouSection({ stores = [] }) {
           <Link
             key={s.id}
             to={storeLink(s)}
+            target="_blank"
+            rel="noopener noreferrer"
             className="flex flex-col items-center gap-2 shrink-0 group snap-start cursor-pointer"
           >
             <div className="p-[3px] rounded-full bg-gradient-to-tr from-emerald-400 via-teal-500 to-indigo-600 group-hover:scale-105 transition-transform duration-300 shadow-sm">
