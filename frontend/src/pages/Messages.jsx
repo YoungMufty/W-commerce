@@ -1142,172 +1142,180 @@ const Messages = () => {
                  </div>
                  
                  {/* Chat Messages */}
-                 <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-transparent custom-scrollbar relative z-10">
+                 <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-5 md:p-6 space-y-4 bg-transparent custom-scrollbar relative z-10">
                    <div className="text-center text-xs font-bold text-gray-400 my-4 tracking-widest uppercase">
                      Encrypted Session Started
                    </div>
                    
-                   {messages.map((msg, idx) => {
-                      const isMine = msg.senderId === 'ME' || msg.isMine || false;
-                      return (
-                         <div key={msg.id || idx} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-                           <div 
-                              onContextMenu={(e) => {
-                                 e.preventDefault();
-                                 e.stopPropagation();
-                                 setContextMenu({ x: e.clientX, y: e.clientY, msg });
-                              }}
-                              className={`p-3 md:p-4 rounded-[1.5rem] max-w-[80%] relative group cursor-context-menu ${
-                              isMine 
-                                ? 'neu-button-primary text-white font-bold rounded-tr-sm' 
-                                : 'neu-card text-[var(--text-main)] font-bold rounded-tl-sm'
-                              }`}
-                           >
-                             {(() => {
-                                const content = msg.content || '';
-                                const isAudio = content.includes('[Audio:');
-                                const isImage = content.includes('[Image:');
+                    {messages.map((msg, idx) => {
+                       const isMine = msg.senderId === 'ME' || msg.isMine || false;
+                       const orderInfo = parseOrderInquiry(msg, orderCache);
+                       return (
+                          <div key={msg.id || idx} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+                            <div 
+                               onContextMenu={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setContextMenu({ x: e.clientX, y: e.clientY, msg });
+                               }}
+                               className={`p-3 md:p-4 rounded-[1.5rem] ${
+                                  orderInfo 
+                                    ? 'w-full max-w-[94%] sm:max-w-[85%] md:max-w-[75%]' 
+                                    : 'max-w-[85%] sm:max-w-[80%]'
+                               } overflow-hidden relative group cursor-context-menu ${
+                               isMine 
+                                 ? 'neu-button-primary text-white font-bold rounded-tr-sm' 
+                                 : 'neu-card text-[var(--text-main)] font-bold rounded-tl-sm'
+                               }`}
+                            >
+                              {(() => {
+                                 const content = msg.content || '';
+                                 const isAudio = content.includes('[Audio:');
+                                 const isImage = content.includes('[Image:');
 
-                                if (isAudio) {
-                                   const audioMatch = content.match(/\[Audio: (.*?)\]/);
-                                   return (
-                                      <div className="flex flex-col min-w-[220px]">
-                                        <audio controls src={audioMatch ? audioMatch[1] : ''} className="w-full h-10" />
-                                      </div>
-                                   );
-                                }
+                                 if (isAudio) {
+                                    const audioMatch = content.match(/\[Audio: (.*?)\]/);
+                                    return (
+                                       <div className="flex flex-col min-w-[220px]">
+                                         <audio controls src={audioMatch ? audioMatch[1] : ''} className="w-full h-10" />
+                                       </div>
+                                    );
+                                 }
 
-                                if (isImage) {
-                                   const imageMatch = content.match(/\[Image: (.*?)\]/);
-                                   return (
-                                      <div>
-                                        <img src={imageMatch ? imageMatch[1] : ''} alt="Attached" className="rounded-xl max-h-60 object-cover mb-2" />
-                                        <p className="text-sm font-bold">Image Attachment</p>
-                                      </div>
-                                   );
-                                }
+                                 if (isImage) {
+                                    const imageMatch = content.match(/\[Image: (.*?)\]/);
+                                    return (
+                                       <div>
+                                         <img src={imageMatch ? imageMatch[1] : ''} alt="Attached" className="rounded-xl max-h-60 object-cover mb-2" />
+                                         <p className="text-sm font-bold">Image Attachment</p>
+                                       </div>
+                                    );
+                                 }
 
-                                const orderInfo = parseOrderInquiry(msg, orderCache);
-                                if (orderInfo) {
-                                   const {
-                                     displayOrderNum,
-                                     orderId,
-                                     status,
-                                     productTitle,
-                                     productImage,
-                                     price,
-                                     quantity,
-                                     inquiryText
-                                   } = orderInfo;
+                                 if (orderInfo) {
+                                    const {
+                                      displayOrderNum,
+                                      orderId,
+                                      status,
+                                      productTitle,
+                                      productImage,
+                                      price,
+                                      quantity,
+                                      inquiryText
+                                    } = orderInfo;
 
-                                   const orderLink = user?.role === 'SELLER' ? '/seller/orders' : `/buyer/orders/${orderId}`;
+                                    const orderLink = user?.role === 'SELLER' ? '/seller/orders' : `/buyer/orders/${orderId}`;
 
-                                   return (
-                                      <div className="flex flex-col gap-3 min-w-[270px] sm:min-w-[340px] max-w-full">
-                                        {/* Header */}
-                                        <div className="flex items-center justify-between gap-2 pb-2 border-b border-[var(--border-color)]/30">
-                                          <div className="flex items-center gap-2">
-                                            <div className={`p-1.5 rounded-lg ${isMine ? 'bg-white/20 text-white' : 'bg-[var(--accent-gray)]/10 text-[var(--accent-gray)]'}`}>
-                                              <Package size={16} />
-                                            </div>
-                                            <div className="flex flex-col leading-tight">
-                                              <span className={`text-[10px] font-black uppercase tracking-wider ${isMine ? 'text-white/80' : 'text-[var(--accent-gray)]'}`}>
-                                                Order Inquiry
-                                              </span>
-                                              <span className={`text-xs font-mono font-bold ${isMine ? 'text-white' : 'text-[var(--text-main)]'}`}>
-                                                {displayOrderNum}
-                                              </span>
-                                            </div>
-                                          </div>
+                                    return (
+                                       <div className="flex flex-col gap-2.5 w-full max-w-full overflow-hidden">
+                                         {/* Header */}
+                                         <div className="flex items-center justify-between gap-2 pb-2 border-b border-white/10 dark:border-white/10">
+                                           <div className="flex items-center gap-1.5 min-w-0">
+                                             <div className={`p-1.5 rounded-lg shrink-0 ${isMine ? 'bg-white/20 text-white' : 'bg-white/10 text-[var(--accent-gray)]'}`}>
+                                               <Package size={14} />
+                                             </div>
+                                             <div className="flex flex-col min-w-0 leading-tight">
+                                               <span className={`text-[9px] font-black uppercase tracking-wider ${isMine ? 'text-white/80' : 'text-gray-400'}`}>
+                                                 Order Inquiry
+                                               </span>
+                                               <span className={`text-xs font-mono font-bold truncate ${isMine ? 'text-white' : 'text-[var(--text-main)]'}`}>
+                                                 {displayOrderNum}
+                                               </span>
+                                             </div>
+                                           </div>
 
-                                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                                            isMine 
-                                              ? 'bg-white/20 text-white border border-white/30'
-                                              : ['PAID', 'CONFIRMED', 'DELIVERED', 'COMPLETED'].includes(status?.toUpperCase())
-                                              ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30'
-                                              : ['SHIPPED', 'IN_TRANSIT'].includes(status?.toUpperCase())
-                                              ? 'bg-sky-500/15 text-sky-500 border border-sky-500/30'
-                                              : 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
-                                          }`}>
-                                            {status || 'PAID'}
-                                          </span>
-                                        </div>
+                                           <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                             isMine 
+                                               ? 'bg-white/20 text-white border border-white/30'
+                                               : ['PAID', 'CONFIRMED', 'DELIVERED', 'COMPLETED'].includes(status?.toUpperCase())
+                                               ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                               : ['SHIPPED', 'IN_TRANSIT'].includes(status?.toUpperCase())
+                                               ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                                               : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                           }`}>
+                                             {status || 'PAID'}
+                                           </span>
+                                         </div>
 
-                                        {/* Product Preview Card */}
-                                        <div className={`flex items-center gap-3 p-2.5 rounded-2xl ${
-                                          isMine 
-                                            ? 'bg-white/10 border border-white/20' 
-                                            : 'bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10'
-                                        } shadow-sm`}>
-                                          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-black/10 dark:bg-black/30 border border-black/10 dark:border-white/10 shrink-0 flex items-center justify-center">
-                                            {productImage ? (
-                                              <img 
-                                                src={productImage} 
-                                                alt={productTitle} 
-                                                className="w-full h-full object-cover transition-transform hover:scale-105 duration-200"
-                                                onError={(e) => {
-                                                  e.target.style.display = 'none';
-                                                  if (e.target.parentElement) {
-                                                    e.target.parentElement.innerHTML = '<div class="flex flex-col items-center justify-center text-gray-400 p-2 text-center"><span class="text-[9px] font-medium">No image</span></div>';
-                                                  }
-                                                }}
-                                              />
-                                            ) : (
-                                              <div className="flex flex-col items-center justify-center text-gray-400 p-2 text-center">
-                                                <Package size={22} className="opacity-60 mb-0.5" />
-                                                <span className="text-[9px] font-medium leading-tight">No image</span>
-                                              </div>
-                                            )}
-                                          </div>
-                                          
-                                          <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
-                                            <div>
-                                              <h4 className={`text-xs sm:text-sm font-bold line-clamp-2 leading-snug ${isMine ? 'text-white' : 'text-[var(--text-main)]'}`} title={productTitle}>
-                                                {productTitle}
-                                              </h4>
-                                              <div className="flex items-center gap-2 mt-1">
-                                                {price ? (
-                                                  <span className={`text-xs font-black ${isMine ? 'text-white' : 'text-[var(--accent-gray)]'}`}>
-                                                    ₦{Number(price).toLocaleString()}
-                                                  </span>
-                                                ) : null}
-                                                <span className={`text-[11px] font-medium ${isMine ? 'text-white/70' : 'text-gray-400'}`}>
-                                                  Qty: {quantity}
-                                                </span>
-                                              </div>
-                                            </div>
+                                         {/* Product Preview Card */}
+                                         <div className={`flex items-center gap-2.5 sm:gap-3 p-2 sm:p-2.5 rounded-2xl w-full max-w-full overflow-hidden ${
+                                           isMine 
+                                             ? 'bg-white/10 border border-white/20' 
+                                             : 'bg-black/20 dark:bg-white/5 border border-black/10 dark:border-white/10'
+                                         } shadow-sm`}>
+                                           <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-black/20 dark:bg-black/40 border border-black/10 dark:border-white/10 shrink-0 flex items-center justify-center">
+                                             {productImage ? (
+                                               <img 
+                                                 src={productImage} 
+                                                 alt={productTitle} 
+                                                 className="w-full h-full object-cover transition-transform hover:scale-105 duration-200"
+                                                 onError={(e) => {
+                                                   e.target.style.display = 'none';
+                                                   if (e.target.parentElement) {
+                                                     e.target.parentElement.innerHTML = '<div class="flex flex-col items-center justify-center text-gray-400 p-1 text-center"><span class="text-[9px] font-medium">No image</span></div>';
+                                                   }
+                                                 }}
+                                               />
+                                             ) : (
+                                               <div className="flex flex-col items-center justify-center text-gray-400 p-1 text-center">
+                                                 <Package size={20} className="opacity-60 mb-0.5" />
+                                                 <span className="text-[9px] font-medium leading-tight">No image</span>
+                                               </div>
+                                             )}
+                                           </div>
+                                           
+                                           <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5 overflow-hidden">
+                                             <div className="min-w-0">
+                                               <h4 className={`text-xs sm:text-sm font-bold line-clamp-2 leading-snug break-words ${isMine ? 'text-white' : 'text-[var(--text-main)]'}`} title={productTitle}>
+                                                 {productTitle}
+                                               </h4>
+                                               <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                                 {price ? (
+                                                   <span className={`text-xs font-black ${isMine ? 'text-white' : 'text-[var(--accent-gray)]'}`}>
+                                                     ₦{Number(price).toLocaleString()}
+                                                   </span>
+                                                 ) : null}
+                                                 <span className={`text-[11px] font-medium ${isMine ? 'text-white/70' : 'text-gray-400'}`}>
+                                                   Qty: {quantity}
+                                                 </span>
+                                               </div>
+                                             </div>
 
-                                            {orderId && (
-                                              <Link 
-                                                to={orderLink}
-                                                onClick={(e) => e.stopPropagation()}
-                                                className={`inline-flex items-center gap-1 text-[11px] font-bold mt-1.5 transition-colors group/link ${
-                                                  isMine ? 'text-white underline hover:text-white/80' : 'text-sky-500 hover:text-sky-400'
-                                                }`}
-                                              >
-                                                <span>View Order Details</span>
-                                                <ExternalLink size={12} className="transition-transform group-hover/link:translate-x-0.5" />
-                                              </Link>
-                                            )}
-                                          </div>
-                                        </div>
+                                             {orderId && (
+                                               <Link 
+                                                 to={orderLink}
+                                                 onClick={(e) => e.stopPropagation()}
+                                                 className={`inline-flex items-center gap-1 text-[11px] font-bold mt-1.5 transition-colors group/link truncate ${
+                                                   isMine ? 'text-white underline hover:text-white/80' : 'text-sky-500 hover:text-sky-400'
+                                                 }`}
+                                               >
+                                                 <span className="truncate">View Order Details</span>
+                                                 <ExternalLink size={12} className="shrink-0 transition-transform group-hover/link:translate-x-0.5" />
+                                               </Link>
+                                             )}
+                                           </div>
+                                         </div>
 
-                                        {/* Inquiry Message Text */}
-                                        {inquiryText ? (
-                                          <div className={`pt-0.5 text-xs sm:text-sm font-medium leading-relaxed ${isMine ? 'text-white/95' : 'text-[var(--text-main)]'}`}>
-                                            <p className="whitespace-pre-wrap">{inquiryText}</p>
-                                          </div>
-                                        ) : null}
-                                      </div>
-                                   );
-                                }
+                                         {/* Inquiry Message Text */}
+                                         {inquiryText ? (
+                                           <div className={`p-2.5 rounded-xl text-xs sm:text-sm font-medium leading-relaxed break-words ${
+                                             isMine 
+                                               ? 'bg-white/10 text-white' 
+                                               : 'bg-black/20 dark:bg-black/40 text-[var(--text-main)] border border-white/5'
+                                           }`}>
+                                             <p className="whitespace-pre-wrap break-words">{inquiryText}</p>
+                                           </div>
+                                         ) : null}
+                                       </div>
+                                    );
+                                 }
 
-                                return <p className="text-sm leading-relaxed font-bold">{msg.content}</p>;
-                             })()}
-                             <div className={`flex items-center gap-1 mt-1 ${isMine ? 'justify-end' : 'justify-start'}`}>
-                               <span className={`text-[10px] font-bold ${isMine ? 'text-black/70' : 'text-gray-400'}`}>{formatTime(msg.createdAt)}</span>
-                               {isMine && <CheckCheck size={14} className="text-black/70" />}
-                             </div>
+                                 return <p className="text-sm leading-relaxed font-bold break-words">{msg.content}</p>;
+                              })()}
+                              <div className={`flex items-center gap-1 mt-1.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
+                                <span className={`text-[10px] font-bold ${isMine ? 'text-white/70' : 'text-gray-400 dark:text-gray-300'}`}>{formatTime(msg.createdAt)}</span>
+                                {isMine && <CheckCheck size={14} className="text-white/70" />}
+                              </div>
                              {msg.reaction && (
                                 <div className={`absolute -bottom-3 ${isMine ? '-left-3' : '-right-3'} bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-full px-2 py-0.5 shadow-md text-sm`}>
                                    {msg.reaction}
