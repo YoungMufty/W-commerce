@@ -116,7 +116,8 @@ export function resolveProductImage(productOrUrl, title = '', category = '') {
   const isWrongGroceryPhoto = rawUrl.includes('1542838132-92c53300491e') && !/(vegetable|produce|tomato|onion|grocery|groceries|fresh market)/i.test(fullText);
   const isSmartwatchFallback = rawUrl.includes(FALLBACK_SMARTWATCH_ID);
   const isActualWatch = fullText.includes('watch') || fullText.includes('chronograph');
-  const isGenericPlaceholder = rawUrl.includes('placeholder') || rawUrl.includes('via.placeholder') || rawUrl.includes('data:image/svg+xml') || isBrokenPhotoId || isWrongGroceryPhoto;
+  const isTruncatedUnsplash = rawUrl.includes('images.unsplash.com') && (!rawUrl.includes('?') || rawUrl.length < 55);
+  const isGenericPlaceholder = rawUrl.includes('placeholder') || rawUrl.includes('via.placeholder') || rawUrl.includes('data:image/svg+xml') || isBrokenPhotoId || isWrongGroceryPhoto || isTruncatedUnsplash;
 
   if (rawUrl && (!isSmartwatchFallback || isActualWatch) && !isGenericPlaceholder) {
     // If the stored URL is a video, convert to a thumbnail image if possible (Cloudinary snapshot)

@@ -191,7 +191,8 @@ function resolveBackendProductImage(product, rawUrl = '') {
   const isSmartwatch = typeof url === 'string' && url.includes(FALLBACK_SMARTWATCH_ID);
   const isActualWatch = combinedText.includes('watch') || combinedText.includes('chronograph');
   const isWrongGroceryPhoto = typeof url === 'string' && url.includes('1542838132-92c53300491e') && !/(vegetable|produce|tomato|onion|grocery|groceries|fresh market)/i.test(combinedText);
-  const isPlaceholder = typeof url === 'string' && (url.includes('placeholder') || url.includes('via.placeholder') || isWrongGroceryPhoto || !url.trim());
+  const isTruncatedUnsplash = typeof url === 'string' && url.includes('images.unsplash.com') && (!url.includes('?') || url.length < 55);
+  const isPlaceholder = typeof url === 'string' && (url.includes('placeholder') || url.includes('via.placeholder') || isWrongGroceryPhoto || isTruncatedUnsplash || !url.trim());
 
   if (url && typeof url === 'string' && url.trim() && (!isSmartwatch || isActualWatch) && !isPlaceholder) {
     // Convert video URLs to image thumbnails if possible (Cloudinary snapshot)
