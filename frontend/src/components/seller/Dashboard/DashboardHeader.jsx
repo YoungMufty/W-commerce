@@ -12,8 +12,9 @@ const DashboardHeader = ({ setIsSidebarOpen, user, storeConfig, setActiveTab }) 
         {user?.subscriptionTier?.toLowerCase()?.includes('premium') && (
           <div className="flex items-center gap-3">
             <button 
+              type="button"
               onClick={() => setActiveTab('design-studio')}
-              className="flex items-center gap-2 px-5 py-2.5 neu-button-primary"
+              className="flex items-center gap-2 px-5 py-2.5 neu-button-primary cursor-pointer"
             >
               <Palette size={18} />
               <span className="hidden sm:inline">Design Studio</span>
@@ -25,8 +26,9 @@ const DashboardHeader = ({ setIsSidebarOpen, user, storeConfig, setActiveTab }) 
       <div className="flex items-center gap-4">
         <NotificationBell />
         <button 
+          type="button"
           onClick={() => setIsSidebarOpen(true)} 
-          className="p-2.5 neu-button"
+          className="p-2.5 neu-button cursor-pointer"
         >
           <Menu size={22} className="text-[var(--text-main)]" />
         </button>

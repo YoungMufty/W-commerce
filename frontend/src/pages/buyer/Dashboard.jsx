@@ -125,6 +125,12 @@ const BuyerDashboard = () => {
     if (pathname.includes('/notifications')) return 'notifications';
     return 'overview';
   });
+  const handleTabChange = (newTab) => {
+    if (!newTab) return;
+    setActiveTab(newTab);
+    navigate(`/buyer/dashboard?tab=${newTab}`, { replace: true });
+  };
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isTopUpModalOpen, setIsTopUpModalOpen] = useState(false);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
@@ -1278,9 +1284,10 @@ const BuyerDashboard = () => {
           <aside className="lg:w-64 flex-shrink-0 hidden lg:block space-y-2">
             {tabs.map(tab => (
               <button
+                type="button"
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === tab.id ? 'bg-black text-white dark:bg-white dark:text-black' : 'text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-main)]'}`}
+                onClick={() => handleTabChange(tab.id)}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all cursor-pointer ${activeTab === tab.id ? 'bg-black text-white dark:bg-white dark:text-black' : 'text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-main)]'}`}
               >
                 <tab.icon size={18} />
                 {tab.label}
@@ -1295,16 +1302,17 @@ const BuyerDashboard = () => {
               <div className="w-72 bg-[var(--bg-primary)] text-[var(--text-main)] h-full relative z-10 flex flex-col border-r border-[var(--border-color)] animate-in slide-in-from-left duration-300">
                 <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center shrink-0">
                   <h2 className="font-extrabold text-xl">Menu</h2>
-                  <button onClick={() => setIsSidebarOpen(false)} className="p-2 hover:bg-[var(--bg-tertiary)] rounded-full text-[var(--text-main)] transition-colors">
+                  <button type="button" onClick={() => setIsSidebarOpen(false)} className="p-2 hover:bg-[var(--bg-tertiary)] rounded-full text-[var(--text-main)] transition-colors cursor-pointer">
                     <X size={20} />
                   </button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-1">
                   {tabs.map(tab => (
                     <button
+                      type="button"
                       key={tab.id}
-                      onClick={() => { setActiveTab(tab.id); setIsSidebarOpen(false); }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === tab.id ? 'bg-black text-white dark:bg-white dark:text-black' : 'text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-main)]'}`}
+                      onClick={() => { handleTabChange(tab.id); setIsSidebarOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all cursor-pointer ${activeTab === tab.id ? 'bg-black text-white dark:bg-white dark:text-black' : 'text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-main)]'}`}
                     >
                       <tab.icon size={18} />
                       {tab.label}

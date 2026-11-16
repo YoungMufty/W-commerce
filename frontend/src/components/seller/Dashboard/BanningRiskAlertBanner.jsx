@@ -229,8 +229,9 @@ const BanningRiskAlertBanner = ({ setActiveTab }) => {
                       <div className="flex items-center gap-2">
                         {setActiveTab && (
                           <button
+                            type="button"
                             onClick={() => setActiveTab('orders')}
-                            className="px-2.5 py-1 text-xs rounded-md bg-white/15 hover:bg-white/25 text-white font-medium transition-colors flex items-center gap-1"
+                            className="px-2.5 py-1 text-xs rounded-md bg-white/15 hover:bg-white/25 text-white font-medium transition-colors flex items-center gap-1 cursor-pointer"
                           >
                             <span>Open Orders</span>
                             <ExternalLink size={12} />
@@ -238,9 +239,10 @@ const BanningRiskAlertBanner = ({ setActiveTab }) => {
                         )}
 
                         <button
+                          type="button"
                           onClick={() => handleCure(inc)}
                           disabled={curingIncidentId === inc.id}
-                          className="px-3 py-1 text-xs rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow-md flex items-center gap-1 disabled:opacity-50"
+                          className="px-3 py-1 text-xs rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all shadow-md flex items-center gap-1 disabled:opacity-50 cursor-pointer"
                         >
                           {curingIncidentId === inc.id ? (
                             <RefreshCw size={12} className="animate-spin" />
@@ -292,8 +294,9 @@ const BanningRiskAlertBanner = ({ setActiveTab }) => {
             <div className="pt-2 flex items-center justify-between text-xs text-white/70">
               <span>Believe a penalty was applied in error due to courier delays?</span>
               <button
+                type="button"
                 onClick={() => setActiveTab('appeal-dispute')}
-                className="text-amber-300 hover:text-white underline font-semibold flex items-center gap-1"
+                className="text-amber-300 hover:text-white underline font-semibold flex items-center gap-1 cursor-pointer"
               >
                 <FileText size={13} />
                 <span>Submit Penalty Appeal</span>

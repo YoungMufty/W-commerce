@@ -79,26 +79,36 @@ const SellerDashboard = ({ initialTab }) => {
   const location = useLocation();
 
   const getEffectiveTab = useCallback(() => {
-    if (initialTab) return initialTab;
     const tabParam = searchParams.get('tab');
-    if (tabParam) return tabParam;
+    if (tabParam) return tabParam === 'inventory' ? 'products' : tabParam;
     if (location.pathname.includes('/seller/orders')) return 'orders';
-    if (location.pathname.includes('/seller/products')) return 'products';
+    if (location.pathname.includes('/seller/products') || location.pathname.includes('/seller/inventory')) return 'products';
     if (location.pathname.includes('/seller/analytics')) return 'analytics';
     if (location.pathname.includes('/seller/settings')) return 'settings';
     if (location.pathname.includes('/seller/external-site')) return 'external-site';
     if (location.pathname.includes('/seller/negotiate-hub')) return 'negotiate-hub';
+    if (initialTab) return initialTab === 'inventory' ? 'products' : initialTab;
     return 'analytics';
   }, [initialTab, searchParams, location.pathname]);
 
-  const [activeTab, setActiveTab] = useState(getEffectiveTab);
+  const [activeTab, setActiveTabState] = useState(getEffectiveTab);
+  const lastUrlTabRef = React.useRef(getEffectiveTab());
+
+  const setActiveTab = useCallback((newTab) => {
+    if (!newTab) return;
+    const normalized = newTab === 'inventory' ? 'products' : newTab;
+    setActiveTabState(normalized);
+    lastUrlTabRef.current = normalized;
+    navigate(`/seller/dashboard?tab=${normalized}`, { replace: true });
+  }, [navigate]);
 
   React.useEffect(() => {
     const effective = getEffectiveTab();
-    if (effective && effective !== activeTab) {
-      setActiveTab(effective);
+    if (effective && effective !== lastUrlTabRef.current) {
+      lastUrlTabRef.current = effective;
+      setActiveTabState(effective);
     }
-  }, [getEffectiveTab, activeTab]);
+  }, [getEffectiveTab]);
 
   const handleLogout = async () => {
     try {

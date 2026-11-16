@@ -665,6 +665,7 @@ export default function ExternalSiteStudio({ user, storeConfig, setActiveTab, on
 
               {typeof setActiveTab === 'function' && (
                 <button
+                  type="button"
                   onClick={() => setActiveTab('studio')}
                   className="neu-card px-6 py-4 rounded-2xl text-xs font-bold text-[var(--text-main)] flex items-center justify-center gap-2 hover:bg-[var(--bg-tertiary)] transition cursor-pointer"
                 >
@@ -806,7 +807,7 @@ export default function ExternalSiteStudio({ user, storeConfig, setActiveTab, on
                       <>
                         <button
                           type="button"
-                          onClick={() => setActiveTab?.('inventory')}
+                          onClick={() => setActiveTab?.('products')}
                           className="px-2.5 py-1 rounded-lg bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold hover:bg-blue-600 hover:text-white transition cursor-pointer flex items-center gap-1 text-[11px]"
                           title="View all imported products in your seller inventory"
                         >
@@ -1603,7 +1604,8 @@ export default function ExternalSiteStudio({ user, storeConfig, setActiveTab, on
           {/* Quick Access Actions Bar */}
           <div className="flex items-center gap-3 flex-wrap">
             <button
-              onClick={() => setActiveTab?.('inventory')}
+              type="button"
+              onClick={() => setActiveTab?.('products')}
               className="neu-button-primary px-5 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 cursor-pointer shadow-md shadow-blue-500/20"
             >
               <Package size={14} />

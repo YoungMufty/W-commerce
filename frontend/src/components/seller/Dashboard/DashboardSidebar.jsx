@@ -7,12 +7,12 @@ const CapsuleButton = ({ label, icon, onClick, isBlue, isItalic, colorClass, ico
   let iClass = 'text-[var(--text-main)]';
   
   const isPerformance = label === 'Performance';
-  const isAnalytics = isBlue || label === 'Analytics';
+  const isActive = Boolean(isBlue);
   const isUpgrade = label === 'Upgrade Plan';
   const isLogout = label === 'Logout';
 
-  if (isAnalytics) {
-    textClass = 'text-[#008cff]';
+  if (isActive) {
+    textClass = 'text-[#008cff] font-bold';
     iClass = 'text-[#008cff]';
   } else if (isUpgrade) {
     textClass = 'text-[#e6a51a]';
@@ -30,13 +30,14 @@ const CapsuleButton = ({ label, icon, onClick, isBlue, isItalic, colorClass, ico
 
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`w-full max-w-[200px] h-10 px-4 flex items-center gap-3 cursor-pointer group transition-all duration-200 ease-out flex-shrink-0 mx-auto rounded-xl neu-input hover:scale-[1.02] active:scale-[0.98] ${isAnalytics ? '!shadow-[inset_4px_4px_8px_rgba(0,140,255,0.1),_inset_-4px_-4px_8px_rgba(0,140,255,0.2)]' : ''}`}
+      className={`w-full max-w-[200px] h-10 px-4 flex items-center gap-3 cursor-pointer group transition-all duration-200 ease-out flex-shrink-0 mx-auto rounded-xl neu-input hover:scale-[1.02] active:scale-[0.98] ${isActive ? '!shadow-[inset_4px_4px_8px_rgba(0,140,255,0.1),_inset_-4px_-4px_8px_rgba(0,140,255,0.2)]' : ''}`}
     >
       <div 
         className={`w-4 h-4 flex items-center justify-center shrink-0 ${iClass} [&>svg]:w-[14px] [&>svg]:h-[14px] [&>svg]:stroke-[1.5] [&>svg]:fill-none`}
         style={{
-          filter: isAnalytics ? 'drop-shadow(0 0 2px rgba(0,140,255,.7))' :
+          filter: isActive ? 'drop-shadow(0 0 2px rgba(0,140,255,.7))' :
                   isUpgrade ? 'drop-shadow(0 0 2px rgba(230,165,26,.45))' :
                   isLogout ? 'drop-shadow(0 0 2px rgba(227,59,66,.4))' : 'none'
         }}
@@ -47,7 +48,7 @@ const CapsuleButton = ({ label, icon, onClick, isBlue, isItalic, colorClass, ico
         className={`text-xs whitespace-nowrap leading-none ${textClass} ${isPerformance ? 'italic font-semibold' : 'font-medium'}`}
         style={{
           fontFamily: isPerformance ? 'Georgia, "Times New Roman", serif' : undefined,
-          textShadow: isAnalytics ? '0 0 4px rgba(0,140,255,.55)' : 'none'
+          textShadow: isActive ? '0 0 4px rgba(0,140,255,.55)' : 'none'
         }}
       >
         {label}
@@ -82,6 +83,7 @@ const DashboardSidebar = ({
           </div>
           
           <button 
+            type="button"
             onClick={() => setIsSidebarOpen(false)} 
             className="lg:hidden absolute right-0 top-0 p-2 rounded-full neu-button text-[var(--text-main)]"
           >
