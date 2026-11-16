@@ -209,39 +209,45 @@ export default function ExternalStoreShowcaseModal({
 
   const storeTier = String(currentStore.sellerTier || 'PRO').toUpperCase();
 
-  return (
-    <AnimatePresence>
-      {isOpen && store && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto">
-        {/* Backdrop */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="fixed inset-0 bg-black/80 backdrop-blur-md"
-        />
+  const portfolioUrl = useMemo(() => {
+    const slug = currentStore.portfolioSlug || (currentStore.storeName ? currentStore.storeName.toLowerCase().replace(/[^a-z0-9]+/g, '-') : currentStore.storeId || currentStore.id);
+    const linkParam = currentStore.linkId ? `?linkId=${encodeURIComponent(currentStore.linkId)}` : '';
+    return `/store/${slug}${linkParam}`;
+  }, [currentStore]);
 
-        {/* Portfolio Showcase Modal */}
-        <motion.div
-          initial={{ scale: 0.94, opacity: 0, y: 25 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.94, opacity: 0, y: 25 }}
-          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-          className="relative w-full max-w-5xl max-h-[92vh] bg-white dark:bg-[#121214] text-slate-900 dark:text-zinc-100 rounded-3xl sm:rounded-[2.5rem] shadow-2xl border border-slate-200/80 dark:border-white/[0.08] flex flex-col overflow-hidden z-10"
-        >
-          {/* Close Button */}
-          <button
-            onClick={onClose}
-            aria-label="Close showcase modal"
-            className="absolute top-4 right-4 z-30 p-2.5 rounded-full bg-black/50 hover:bg-black/80 text-white backdrop-blur-md transition-all duration-200 cursor-pointer border border-white/20 shadow-lg active:scale-95"
+  const showcaseContent = (
+    <>
+      {/* Top Action Buttons (Open in New Tab & Close) */}
+      <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+        {!isFullPage && (
+          <a
+            href={portfolioUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open portfolio in new tab"
+            title="Open portfolio in new tab"
+            className="p-2.5 rounded-full bg-black/50 hover:bg-black/80 text-white backdrop-blur-md transition-all duration-200 cursor-pointer border border-white/20 shadow-lg active:scale-95 flex items-center justify-center"
           >
-            <X size={18} />
-          </button>
+            <ExternalLink size={16} />
+          </a>
+        )}
 
-          {/* ══════════════════════════════════════════════════════════════════
-              1. LUXURY PORTFOLIO HERO & BRAND IDENTITY BANNER
-             ══════════════════════════════════════════════════════════════════ */}
+        <button
+          onClick={onClose}
+          aria-label={isFullPage ? "Back" : "Close showcase modal"}
+          title={isFullPage ? "Back" : "Close"}
+          className={`p-2.5 rounded-full bg-black/50 hover:bg-black/80 text-white backdrop-blur-md transition-all duration-200 cursor-pointer border border-white/20 shadow-lg active:scale-95 flex items-center gap-1.5 ${
+            isFullPage ? 'px-3.5 py-2 text-xs font-bold' : ''
+          }`}
+        >
+          <X size={isFullPage ? 14 : 18} />
+          {isFullPage && <span>Close</span>}
+        </button>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          1. LUXURY PORTFOLIO HERO & BRAND IDENTITY BANNER
+         ══════════════════════════════════════════════════════════════════ */}
           <div className="relative h-60 sm:h-72 w-full overflow-hidden shrink-0 select-none bg-slate-950">
             {/* Background Cover Image with Editorial Dark Scrim */}
             <img
@@ -683,8 +689,43 @@ export default function ExternalStoreShowcaseModal({
               </div>
             )}
           </div>
-        </motion.div>
+    </>
+  );
+
+  if (isFullPage) {
+    return (
+      <div className="min-h-screen w-full bg-slate-100 dark:bg-[#0c0c0e] text-slate-900 dark:text-zinc-100 flex flex-col py-0 sm:py-6 sm:px-4">
+        <div className="relative w-full max-w-6xl mx-auto bg-white dark:bg-[#121214] text-slate-900 dark:text-zinc-100 sm:rounded-[2.5rem] shadow-2xl border border-slate-200/80 dark:border-white/[0.08] flex flex-col overflow-hidden">
+          {showcaseContent}
+        </div>
       </div>
+    );
+  }
+
+  return (
+    <AnimatePresence>
+      {isOpen && store && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto">
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/80 backdrop-blur-md"
+          />
+
+          {/* Portfolio Showcase Modal */}
+          <motion.div
+            initial={{ scale: 0.94, opacity: 0, y: 25 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.94, opacity: 0, y: 25 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            className="relative w-full max-w-5xl max-h-[92vh] bg-white dark:bg-[#121214] text-slate-900 dark:text-zinc-100 rounded-3xl sm:rounded-[2.5rem] shadow-2xl border border-slate-200/80 dark:border-white/[0.08] flex flex-col overflow-hidden z-10"
+          >
+            {showcaseContent}
+          </motion.div>
+        </div>
       )}
     </AnimatePresence>
   );
