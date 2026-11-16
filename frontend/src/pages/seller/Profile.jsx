@@ -180,7 +180,7 @@ const SellerProfile = () => {
                   <MessageCircle size={18} /> Message
                 </button>
                 {store && (
-                  <Link to={`/store/${store.slug || store.id}`} className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 border border-white/20 hover:border-white/40 text-white rounded-xl font-semibold transition-colors">
+                  <Link to={`/store/${store.slug || store.id}`} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 border border-white/20 hover:border-white/40 text-white rounded-xl font-semibold transition-colors">
                     <StoreIcon size={18} /> Visit Store
                   </Link>
                 )}
@@ -255,7 +255,7 @@ const SellerProfile = () => {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.3 }} className="space-y-6">
             
             {/* Store Card */}
-            <Link to={`/store/${store.slug || store.id}`} className="block group">
+            <Link to={`/store/${store.slug || store.id}`} target="_blank" rel="noopener noreferrer" className="block group">
               <div className="relative bg-gradient-to-r from-blue-900/40 to-purple-900/40 backdrop-blur-[24px] border border-blue-500/30 rounded-[2.5rem] p-6 sm:p-8 hover:border-blue-500/60 shadow-[0_8px_32px_0_rgba(59,130,246,0.15)] transition-all overflow-hidden">
                 <div className="absolute inset-0 pointer-events-none rounded-[2.5rem]" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%)', boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.2)' }} />
                 <h2 className="relative z-10 text-[10px] font-black text-blue-300 tracking-widest uppercase mb-4 drop-shadow-sm">Seller's Store</h2>
@@ -277,7 +277,7 @@ const SellerProfile = () => {
                 <div className="absolute inset-0 pointer-events-none rounded-[2.5rem]" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 100%)', boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.2)' }} />
                 <div className="relative z-10 flex items-center justify-between mb-6">
                   <h2 className="text-[10px] font-black text-gray-400 tracking-widest uppercase drop-shadow-sm">Top Products</h2>
-                  <Link to={`/store/${store.slug || store.id}`} className="text-sm font-bold text-blue-400 hover:text-blue-300 drop-shadow-sm">View all →</Link>
+                  <Link to={`/store/${store.slug || store.id}`} target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-blue-400 hover:text-blue-300 drop-shadow-sm">View all →</Link>
                 </div>
                 <div className="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-4">
                   {store.topProducts.slice(0,4).map(product => (

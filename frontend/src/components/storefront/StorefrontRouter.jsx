@@ -143,9 +143,21 @@ const StorefrontRouter = () => {
         return (
             <ExternalStoreShowcaseModal
                 isOpen={true}
-                onClose={() => navigate(-1)}
+                onClose={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
                 store={store}
                 isFullPage={true}
+                onAddToCart={async (product) => {
+                    const toast = (await import('react-hot-toast')).default;
+                    try {
+                        const id = product.id || product.productId || product.externalOfferId;
+                        if (id) {
+                            await addToCart(id, 1);
+                            toast.success("Added to cart");
+                        }
+                    } catch (e) {
+                        toast.error("Failed to add to cart");
+                    }
+                }}
             />
         );
     }

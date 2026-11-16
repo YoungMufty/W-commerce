@@ -689,7 +689,7 @@ const ProductDetails = () => {
                  <div className="mb-6 rounded-xl overflow-hidden border border-[var(--border-color)] bg-[var(--bg-tertiary)] hover:border-[var(--accent-gray)] transition-all relative">
                     <div 
                        className="cursor-pointer" 
-                       onClick={() => navigate(`/store/${product.store.portfolioSlug || product.store.id}`)}
+                       onClick={() => window.open(`/store/${product.store.portfolioSlug || product.store.id}`, '_blank')}
                     >
                        {product.store.bannerUrl && (
                            <div className="h-24 w-full bg-gray-200">
@@ -1085,7 +1085,7 @@ const ProductDetails = () => {
                 </div>
                 <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-[var(--border-color)]">
                   <button 
-                    onClick={() => navigate(`/store/${product.store.portfolioSlug || product.store.id}`)}
+                    onClick={() => window.open(`/store/${product.store.portfolioSlug || product.store.id}`, '_blank')}
                     className="px-4 py-2 rounded-xl text-xs font-bold bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-black transition-colors"
                   >
                     Visit {product.store.storeName}&apos;s Storefront &rarr;

@@ -100,7 +100,7 @@ const GlobalSearchModal = ({
                          </div>
                          
                          <button 
-                           onClick={() => navigate(`/store/${product.store?.portfolioSlug || product.storeId}`)}
+                           onClick={() => window.open(`/store/${product.store?.portfolioSlug || product.storeId}`, '_blank')}
                            className="w-full py-4 rounded-xl font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 shadow-lg overflow-hidden relative"
                            style={{ backgroundColor: primaryColor, color: '#fff', boxShadow: `0 10px 25px ${primaryColor}50` }}
                          >

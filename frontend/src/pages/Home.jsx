@@ -259,7 +259,7 @@ export default function Home() {
                 key={store.id}
                 className="neu-card shrink-0 w-[300px] md:w-[340px] flex flex-col group snap-start hover:-translate-y-1 transition-transform overflow-hidden"
               >
-                <Link to={`/store/${store.slug || store.id}`} onClick={() => window.scrollTo(0, 0)} className="block h-full cursor-pointer">
+                <Link to={`/store/${store.slug || store.id}`} target="_blank" rel="noopener noreferrer" className="block h-full cursor-pointer">
                   {/* Full Card Banner/Image */}
                   <div className="h-[400px] relative overflow-hidden bg-[var(--bg-secondary)] rounded-xl">
                     {store.bannerUrl ? (
