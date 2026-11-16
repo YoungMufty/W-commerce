@@ -28,7 +28,8 @@ export default function ExternalStoreShowcaseModal({
   formatLocalPrice,
   resolveOfferPrices,
   onAddToCart,
-  destinationCountry = 'NG'
+  destinationCountry = 'NG',
+  isFullPage = false
 }) {
   const [showcaseData, setShowcaseData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);

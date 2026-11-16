@@ -4,7 +4,8 @@ import toast from 'react-hot-toast';
 import { 
   Search, Send, Paperclip, MoreVertical, Phone, Video, Mic,
   ShieldCheck, Check, CheckCheck, Clock, FileText, Image as ImageIcon, 
-  Smile, Edit, CircleDashed, Info, MapPin, Briefcase, Calendar, Star, X, PhoneOff, Languages, Reply, Share, Copy, Trash2, CheckCircle2, Plus, ArrowLeft, MessageCircle, ShoppingBag
+  Smile, Edit, CircleDashed, Info, MapPin, Briefcase, Calendar, Star, X, PhoneOff, Languages, Reply, Share, Copy, Trash2, CheckCircle2, Plus, ArrowLeft, MessageCircle, ShoppingBag,
+  Package, ExternalLink
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { apiClient as axios } from '@/utils/apiClient';
@@ -14,6 +15,78 @@ import EmojiPicker from 'emoji-picker-react';
 import VoiceCallVisualizer from '../components/chat/VoiceCallVisualizer';
 
 export const getAvatarFallback = (name) => `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=random`;
+
+export const parseOrderInquiry = (msg, orderCache = {}) => {
+  if (!msg) return null;
+  const content = msg.content || '';
+  const match = content.match(/(?:📦\s*)?\*?\*?\[Order Inquiry:\s*#?([A-Za-z0-9_-]+)(?:\s*\((#?[A-Za-z0-9_-]+)\))?\]\*?\*?\s*([\s\S]*)/i);
+  
+  const isOrderInquiry = Boolean(match) || Boolean(msg.orderPreview) || (Boolean(msg.orderId) && content.toLowerCase().includes('order'));
+  if (!isOrderInquiry) return null;
+
+  const rawOrderNum = match ? match[1] : (msg.orderPreview?.orderNumber || (msg.orderId ? `#${msg.orderId.slice(0, 8)}` : null));
+  const secondaryId = match && match[2] ? match[2].replace(/^#/, '') : null;
+  
+  let inquiryText = match ? match[3].trim() : content;
+  inquiryText = inquiryText.replace(/^[\*\s\n\r]+/, '').trim();
+
+  // Resolve cached order if available
+  const cached = (rawOrderNum && orderCache[rawOrderNum]) 
+    || (secondaryId && orderCache[secondaryId]) 
+    || (msg.orderId && orderCache[msg.orderId]) 
+    || (msg.orderPreview?.id && orderCache[msg.orderPreview.id]);
+    
+  const cachedFirstItem = cached?.items?.[0];
+
+  // Resolve product image
+  const productImage = msg.orderPreview?.productImage 
+    || cachedFirstItem?.imageUrl 
+    || cachedFirstItem?.image 
+    || cachedFirstItem?.product?.images?.[0]?.url 
+    || msg.productPreview?.image 
+    || null;
+
+  // Resolve product title
+  const productTitle = msg.orderPreview?.productTitle 
+    || cachedFirstItem?.title 
+    || cachedFirstItem?.product?.title 
+    || msg.productPreview?.title 
+    || 'Ordered Product';
+
+  // Resolve price
+  const price = msg.orderPreview?.priceAtTime 
+    || msg.orderPreview?.totalAmount 
+    || cachedFirstItem?.price 
+    || cached?.totalAmount 
+    || cached?.grandTotal 
+    || null;
+
+  // Resolve quantity
+  const quantity = msg.orderPreview?.quantity || cachedFirstItem?.quantity || 1;
+
+  // Resolve status
+  const status = msg.orderPreview?.status || cached?.status || cached?.fulfillmentStatus || 'PAID';
+
+  // Format display order number
+  let displayOrderNum = rawOrderNum || msg.orderPreview?.orderNumber || (msg.orderId ? `#${msg.orderId.slice(0, 8)}` : 'ORDER');
+  if (displayOrderNum && !displayOrderNum.startsWith('#')) {
+    displayOrderNum = `#${displayOrderNum}`;
+  }
+
+  const orderId = msg.orderPreview?.id || msg.orderId || secondaryId || rawOrderNum;
+
+  return {
+    isOrderInquiry: true,
+    displayOrderNum,
+    orderId,
+    status,
+    productTitle,
+    productImage,
+    price,
+    quantity,
+    inquiryText
+  };
+};
 
 const Messages = () => {
   const location = useLocation();
@@ -28,6 +101,7 @@ const Messages = () => {
   const [conversations, setConversations] = useState([]);
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState('');
+  const [orderCache, setOrderCache] = useState({});
 
   const playMessageSound = () => {
     try {
@@ -386,6 +460,52 @@ const Messages = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Prefetch order details for any order inquiry message missing a product image
+  useEffect(() => {
+    if (!messages || messages.length === 0) return;
+    const fetchQueue = [];
+
+    messages.forEach(msg => {
+      const content = msg.content || '';
+      const match = content.match(/(?:📦\s*)?\*?\*?\[Order Inquiry:\s*#?([A-Za-z0-9_-]+)(?:\s*\((#?[A-Za-z0-9_-]+)\))?\]/i);
+      const isOrderMsg = Boolean(match) || Boolean(msg.orderPreview) || Boolean(msg.orderId);
+      
+      if (!isOrderMsg) return;
+
+      const hasImage = Boolean(msg.orderPreview?.productImage || msg.productPreview?.image);
+      if (hasImage) return;
+
+      const rawNum = match ? match[1] : null;
+      const secId = match && match[2] ? match[2].replace(/^#/, '') : null;
+      const targetId = secId || msg.orderPreview?.id || msg.orderId || rawNum;
+
+      if (targetId && !orderCache[targetId] && (!rawNum || !orderCache[rawNum])) {
+        fetchQueue.push({ targetId, rawNum, secId });
+      }
+    });
+
+    if (fetchQueue.length === 0) return;
+
+    fetchQueue.forEach(({ targetId, rawNum, secId }) => {
+      axios.get(`/api/v1/orders/${targetId}`)
+        .catch(() => axios.get(`/api/v1/payai/orders/${targetId}`))
+        .then(res => {
+          if (res?.data?.success && res.data.order) {
+            const ord = res.data.order;
+            setOrderCache(prev => ({
+              ...prev,
+              [targetId]: ord,
+              ...(rawNum ? { [rawNum]: ord } : {}),
+              ...(secId ? { [secId]: ord } : {}),
+              ...(ord.id ? { [ord.id]: ord } : {}),
+              ...(ord.orderNumber ? { [ord.orderNumber.replace(/^#/, '')]: ord } : {})
+            }));
+          }
+        })
+        .catch(() => {});
+    });
+  }, [messages, orderCache]);
 
 
   async function fetchConversations() {
@@ -1043,18 +1163,147 @@ const Messages = () => {
                                 : 'neu-card text-[var(--text-main)] font-bold rounded-tl-sm'
                               }`}
                            >
-                             {(msg.content || '').includes('[Audio:') ? (
-                                <div className="flex flex-col min-w-[220px]">
-                                  <audio controls src={(msg.content || '').match(/\[Audio: (.*?)\]/)[1]} className="w-full h-10" />
-                                </div>
-                             ) : (msg.content || '').includes('[Image:') ? (
-                                <div>
-                                  <img src={(msg.content || '').match(/\[Image: (.*?)\]/)[1]} alt="Attached" className="rounded-xl max-h-60 object-cover mb-2" />
-                                  <p className="text-sm font-bold">Image Attachment</p>
-                                </div>
-                             ) : (
-                                <p className="text-sm leading-relaxed font-bold">{msg.content}</p>
-                             )}
+                             {(() => {
+                                const content = msg.content || '';
+                                const isAudio = content.includes('[Audio:');
+                                const isImage = content.includes('[Image:');
+
+                                if (isAudio) {
+                                   const audioMatch = content.match(/\[Audio: (.*?)\]/);
+                                   return (
+                                      <div className="flex flex-col min-w-[220px]">
+                                        <audio controls src={audioMatch ? audioMatch[1] : ''} className="w-full h-10" />
+                                      </div>
+                                   );
+                                }
+
+                                if (isImage) {
+                                   const imageMatch = content.match(/\[Image: (.*?)\]/);
+                                   return (
+                                      <div>
+                                        <img src={imageMatch ? imageMatch[1] : ''} alt="Attached" className="rounded-xl max-h-60 object-cover mb-2" />
+                                        <p className="text-sm font-bold">Image Attachment</p>
+                                      </div>
+                                   );
+                                }
+
+                                const orderInfo = parseOrderInquiry(msg, orderCache);
+                                if (orderInfo) {
+                                   const {
+                                     displayOrderNum,
+                                     orderId,
+                                     status,
+                                     productTitle,
+                                     productImage,
+                                     price,
+                                     quantity,
+                                     inquiryText
+                                   } = orderInfo;
+
+                                   const orderLink = user?.role === 'SELLER' ? '/seller/orders' : `/buyer/orders/${orderId}`;
+
+                                   return (
+                                      <div className="flex flex-col gap-3 min-w-[270px] sm:min-w-[340px] max-w-full">
+                                        {/* Header */}
+                                        <div className="flex items-center justify-between gap-2 pb-2 border-b border-[var(--border-color)]/30">
+                                          <div className="flex items-center gap-2">
+                                            <div className={`p-1.5 rounded-lg ${isMine ? 'bg-white/20 text-white' : 'bg-[var(--accent-gray)]/10 text-[var(--accent-gray)]'}`}>
+                                              <Package size={16} />
+                                            </div>
+                                            <div className="flex flex-col leading-tight">
+                                              <span className={`text-[10px] font-black uppercase tracking-wider ${isMine ? 'text-white/80' : 'text-[var(--accent-gray)]'}`}>
+                                                Order Inquiry
+                                              </span>
+                                              <span className={`text-xs font-mono font-bold ${isMine ? 'text-white' : 'text-[var(--text-main)]'}`}>
+                                                {displayOrderNum}
+                                              </span>
+                                            </div>
+                                          </div>
+
+                                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                            isMine 
+                                              ? 'bg-white/20 text-white border border-white/30'
+                                              : ['PAID', 'CONFIRMED', 'DELIVERED', 'COMPLETED'].includes(status?.toUpperCase())
+                                              ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30'
+                                              : ['SHIPPED', 'IN_TRANSIT'].includes(status?.toUpperCase())
+                                              ? 'bg-sky-500/15 text-sky-500 border border-sky-500/30'
+                                              : 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
+                                          }`}>
+                                            {status || 'PAID'}
+                                          </span>
+                                        </div>
+
+                                        {/* Product Preview Card */}
+                                        <div className={`flex items-center gap-3 p-2.5 rounded-2xl ${
+                                          isMine 
+                                            ? 'bg-white/10 border border-white/20' 
+                                            : 'bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/10'
+                                        } shadow-sm`}>
+                                          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-black/10 dark:bg-black/30 border border-black/10 dark:border-white/10 shrink-0 flex items-center justify-center">
+                                            {productImage ? (
+                                              <img 
+                                                src={productImage} 
+                                                alt={productTitle} 
+                                                className="w-full h-full object-cover transition-transform hover:scale-105 duration-200"
+                                                onError={(e) => {
+                                                  e.target.style.display = 'none';
+                                                  if (e.target.parentElement) {
+                                                    e.target.parentElement.innerHTML = '<div class="flex flex-col items-center justify-center text-gray-400 p-2 text-center"><span class="text-[9px] font-medium">No image</span></div>';
+                                                  }
+                                                }}
+                                              />
+                                            ) : (
+                                              <div className="flex flex-col items-center justify-center text-gray-400 p-2 text-center">
+                                                <Package size={22} className="opacity-60 mb-0.5" />
+                                                <span className="text-[9px] font-medium leading-tight">No image</span>
+                                              </div>
+                                            )}
+                                          </div>
+                                          
+                                          <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+                                            <div>
+                                              <h4 className={`text-xs sm:text-sm font-bold line-clamp-2 leading-snug ${isMine ? 'text-white' : 'text-[var(--text-main)]'}`} title={productTitle}>
+                                                {productTitle}
+                                              </h4>
+                                              <div className="flex items-center gap-2 mt-1">
+                                                {price ? (
+                                                  <span className={`text-xs font-black ${isMine ? 'text-white' : 'text-[var(--accent-gray)]'}`}>
+                                                    ₦{Number(price).toLocaleString()}
+                                                  </span>
+                                                ) : null}
+                                                <span className={`text-[11px] font-medium ${isMine ? 'text-white/70' : 'text-gray-400'}`}>
+                                                  Qty: {quantity}
+                                                </span>
+                                              </div>
+                                            </div>
+
+                                            {orderId && (
+                                              <Link 
+                                                to={orderLink}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className={`inline-flex items-center gap-1 text-[11px] font-bold mt-1.5 transition-colors group/link ${
+                                                  isMine ? 'text-white underline hover:text-white/80' : 'text-sky-500 hover:text-sky-400'
+                                                }`}
+                                              >
+                                                <span>View Order Details</span>
+                                                <ExternalLink size={12} className="transition-transform group-hover/link:translate-x-0.5" />
+                                              </Link>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        {/* Inquiry Message Text */}
+                                        {inquiryText ? (
+                                          <div className={`pt-0.5 text-xs sm:text-sm font-medium leading-relaxed ${isMine ? 'text-white/95' : 'text-[var(--text-main)]'}`}>
+                                            <p className="whitespace-pre-wrap">{inquiryText}</p>
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                   );
+                                }
+
+                                return <p className="text-sm leading-relaxed font-bold">{msg.content}</p>;
+                             })()}
                              <div className={`flex items-center gap-1 mt-1 ${isMine ? 'justify-end' : 'justify-start'}`}>
                                <span className={`text-[10px] font-bold ${isMine ? 'text-black/70' : 'text-gray-400'}`}>{formatTime(msg.createdAt)}</span>
                                {isMine && <CheckCheck size={14} className="text-black/70" />}

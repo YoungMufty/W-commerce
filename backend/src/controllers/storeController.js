@@ -2,6 +2,7 @@ const prisma = require('../utils/prismaClient');
 const walletService = require('../services/walletService');
 const logger = require('../utils/logger');
 const { getJwtSecret } = require('../utils/jwtSecret');
+const sellerExternalSiteService = require('../services/payai/sellerExternalSiteService');
 // Private: Update Store Portfolio & Bank Details (used by userRoutes /store-update)
 exports.updateStore = async (req, res) => {
     try {
@@ -822,6 +823,153 @@ module.exports.getStoreBySlug = async (req, res) => {
             // Auto-fix the slug if found
             if (store) {
                 await prisma.store.update({ where: { id: store.id }, data: { portfolioSlug: sluggifiedParam || normalizedSlug } });
+            }
+        }
+
+        // Support External / Connected Store Portfolio Showcases (e.g. Gymshark, AliExpress, Amazon)
+        if (!store) {
+            try {
+                const discoverable = await sellerExternalSiteService.getDiscoverableExternalStores();
+                const targetLink = req.query.linkId;
+                const match = discoverable.find(d => {
+                    const dSlug = (d.storeName || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                    return (
+                        (targetLink && d.linkId === targetLink) ||
+                        d.storeId === slug ||
+                        d.linkId === slug ||
+                        dSlug === normalizedSlug ||
+                        (d.storeName && d.storeName.toLowerCase() === normalizedSlug)
+                    );
+                });
+
+                if (match) {
+                    const showcase = await sellerExternalSiteService.getExternalStoreShowcase(match.storeId, match.linkId);
+                    const showcaseStore = showcase?.store || match;
+                    const showcaseProducts = showcase?.products || match.sampleProducts || [];
+                    return res.json({
+                        success: true,
+                        data: {
+                            isExternalShowcase: true,
+                            store: {
+                                id: showcaseStore.storeId || match.storeId,
+                                storeId: showcaseStore.storeId || match.storeId,
+                                linkId: showcaseStore.linkId || match.linkId,
+                                sellerId: showcaseStore.storeId || match.storeId,
+                                slug: match.storeName?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || slug,
+                                name: showcaseStore.storeName,
+                                storeName: showcaseStore.storeName,
+                                logo: showcaseStore.logoUrl,
+                                logoUrl: showcaseStore.logoUrl,
+                                banner: showcaseStore.bannerUrl,
+                                bannerUrl: showcaseStore.bannerUrl,
+                                description: showcaseStore.description,
+                                isVerified: true,
+                                country: showcaseStore.originCountry || 'US',
+                                averageRating: showcaseStore.rating || 4.9,
+                                totalReviews: showcaseStore.totalReviews || 120,
+                                subscriptionTier: showcaseStore.sellerTier || 'PRO',
+                                sellerTier: showcaseStore.sellerTier || 'PRO',
+                                platform: showcaseStore.platform || 'custom_store',
+                                externalUrl: showcaseStore.externalUrl,
+                                sampleProducts: showcaseProducts
+                            },
+                            seller: {
+                                id: showcaseStore.storeId || match.storeId,
+                                name: showcaseStore.sellerName,
+                                avatar: showcaseStore.logoUrl,
+                                verified: true
+                            },
+                            metrics: {
+                                followers: 450,
+                                likes: 890,
+                                products: showcaseProducts.length,
+                                rating: showcaseStore.rating || 4.9,
+                                reviews: showcaseStore.totalReviews || 120,
+                                banningRate: 0
+                            },
+                            products: showcaseProducts,
+                            posts: [],
+                            brandConfig: {},
+                            portfolio: {
+                                theme: `${showcaseStore.sellerTier || 'PRO'} Portfolio`,
+                                customCss: '',
+                                sections: [],
+                                banners: [],
+                                layout: 'Showcase'
+                            },
+                            isFollowing: false
+                        }
+                    });
+                }
+            } catch (extErr) {
+                logger.debug(`External store showcase check failed: ${extErr.message}`);
+            }
+        }
+
+        // If store was found and linkId query param was explicitly specified, return the showcase for that link
+        if (store && req.query.linkId) {
+            try {
+                const showcase = await sellerExternalSiteService.getExternalStoreShowcase(store.id, req.query.linkId);
+                if (showcase?.success && showcase.store) {
+                    const showcaseStore = showcase.store;
+                    const showcaseProducts = showcase.products || [];
+                    return res.json({
+                        success: true,
+                        data: {
+                            isExternalShowcase: true,
+                            store: {
+                                id: store.id,
+                                storeId: store.id,
+                                linkId: req.query.linkId,
+                                sellerId: store.sellerId,
+                                slug: store.portfolioSlug || slug,
+                                name: showcaseStore.storeName || store.storeName,
+                                storeName: showcaseStore.storeName || store.storeName,
+                                logo: showcaseStore.logoUrl || store.logoUrl,
+                                logoUrl: showcaseStore.logoUrl || store.logoUrl,
+                                banner: showcaseStore.bannerUrl || store.bannerUrl,
+                                bannerUrl: showcaseStore.bannerUrl || store.bannerUrl,
+                                description: showcaseStore.description || store.description,
+                                isVerified: store.isVerified,
+                                country: showcaseStore.originCountry || store.country || 'US',
+                                averageRating: store.averageRating,
+                                totalReviews: store.totalReviews,
+                                subscriptionTier: showcaseStore.sellerTier || store.user?.subscriptionTier || 'PRO',
+                                sellerTier: showcaseStore.sellerTier || store.sellerTier || 'PRO',
+                                platform: showcaseStore.platform || 'custom_store',
+                                externalUrl: showcaseStore.externalUrl || showcaseStore.storeUrl,
+                                sampleProducts: showcaseProducts
+                            },
+                            seller: {
+                                id: store.user.id,
+                                name: store.user.fullName,
+                                avatar: store.user.avatarUrl,
+                                verified: store.user.isVerified
+                            },
+                            metrics: {
+                                followers: 450,
+                                likes: 890,
+                                products: showcaseProducts.length,
+                                rating: store.averageRating,
+                                reviews: store.totalReviews,
+                                banningRate: 0
+                            },
+                            products: showcaseProducts,
+                            posts: [],
+                            brandConfig: store.portfolioConfig ? JSON.parse(store.portfolioConfig) : {},
+                            portfolio: {
+                                theme: `${showcaseStore.sellerTier || 'PRO'} Portfolio`,
+                                customCss: '',
+                                sections: [],
+                                banners: [],
+                                layout: 'Showcase'
+                            },
+                            isFollowing: false
+                        }
+                    });
+                }
+            } catch (linkErr) {
+                logger.debug(`Specific linkId showcase lookup skipped: ${linkErr.message}`);
             }
         }
 
