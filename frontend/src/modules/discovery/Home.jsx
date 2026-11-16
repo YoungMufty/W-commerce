@@ -307,7 +307,7 @@ export default function Home() {
             {stories.map(s => (
               <button
                 key={s.id}
-                onClick={() => s.slug ? navigate(`/store/${s.slug}`) : navigate('/feed')}
+                onClick={() => s.slug ? window.open(`/store/${s.slug}`, '_blank') : navigate('/feed')}
                 className="flex-shrink-0 flex flex-col items-center gap-1.5"
               >
                 <div className={`p-0.5 rounded-full bg-gradient-to-br ${s.color}`}>
@@ -462,6 +462,8 @@ export default function Home() {
               <Link
                 key={store.id}
                 to={store.slug ? `/store/${store.slug}` : '/search'}
+                target={store.slug ? '_blank' : undefined}
+                rel={store.slug ? 'noopener noreferrer' : undefined}
                 className="flex-shrink-0 w-48 bg-[var(--bg-card)] rounded-2xl border border-[var(--border-subtle)] hover:border-[var(--border-hover)] transition-all p-4 hover:-translate-y-1 block"
               >
                 <div className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] flex items-center justify-center overflow-hidden mb-2">
