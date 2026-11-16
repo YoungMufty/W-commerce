@@ -53,6 +53,7 @@ const Messages = lazy(() => import('./pages/Messages'));
 const ProductDetails = lazy(() => import('./pages/ProductDetails'));
 const PayAIPage = lazy(() => import('./pages/PayAI'));
 const SystemStories = lazy(() => import('./pages/admin/SystemStories'));
+const QRScanPage = lazy(() => import('./pages/QRScanPage'));
 
 // Storefront Pages
 const StorefrontRouter = lazy(() => import('./components/storefront/StorefrontRouter'));
@@ -162,6 +163,7 @@ const AnimatedRoutes = () => {
             <Route path={ROUTES.CART} element={<Cart />} />
             <Route path={ROUTES.MESSAGES} element={<Messages />} />
             <Route path={ROUTES.PRODUCT} element={<ProductDetails />} />
+            <Route path={ROUTES.SCAN} element={<QRScanPage />} />
             <Route path={ROUTES.PAYAI} element={<PayAIPage />} />
             <Route path={ROUTES.SYSTEM_STORIES} element={<SystemStories />} />
             <Route path="/seller/:sellerId" element={<SellerProfile />} />

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Search, ShoppingCart, User } from 'lucide-react';
+import { Home, Search, ShoppingCart, User, QrCode } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { useCartStore } from '../../store/cartStore';
@@ -12,6 +12,7 @@ const BottomNav = () => {
   const navItems = [
     { name: 'Home',    path: '/',       icon: Home },
     { name: 'Shop',    path: '/shop',   icon: Search },
+    { name: 'Scan',    path: '/scan',   icon: QrCode },
     {
       name: 'Cart',
       path: '/cart',

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, User, Menu, Sparkles, WifiOff } from 'lucide-react';
+import { ShoppingCart, User, Menu, Sparkles, WifiOff, QrCode } from 'lucide-react';
 import SearchBar from './SearchBar';
 import MegaMenu from './MegaMenu';
 import NotificationBell from './NotificationBell';
 import MobileDrawer from './MobileDrawer';
 import { useCartStore } from '../../store/cartStore';
 import { useAuthStore } from '../../store/authStore';
+import { useQRStore } from '../../store/qrStore';
 import { useTheme } from '../../context/ThemeContext';
 import { ROUTES } from '../../constants/routes';
 import { useOffline } from '../../offline/useOffline';
@@ -19,6 +20,7 @@ const Navbar = ({ onSearch, onCategorySelect }) => {
   const isDarkMode = theme === 'dark';
   const navigate = useNavigate();
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const { openScanner } = useQRStore();
   
   
   
@@ -119,6 +121,15 @@ const Navbar = ({ onSearch, onCategorySelect }) => {
           <div className="shrink-0 w-10 h-10">
             <NotificationBell />
           </div>
+
+          <button
+            onClick={() => openScanner()}
+            className="neu-button w-10 h-10 shrink-0 flex items-center justify-center rounded-xl text-[var(--text-main)] hover:text-blue-500 transition-colors"
+            title="Scan QR Code (Product, Store, Order, Receipt, Transaction)"
+            aria-label="Scan QR Code"
+          >
+            <QrCode size={19} />
+          </button>
 
           <Link to="/cart" className="hidden sm:flex relative neu-button w-10 h-10 hover:text-[var(--text-main)] shrink-0 items-center justify-center group rounded-xl text-[var(--text-main)]">
             <ShoppingCart size={20} className="transition-transform duration-300 group-hover:scale-110 text-[var(--text-main)] dark:text-white" />

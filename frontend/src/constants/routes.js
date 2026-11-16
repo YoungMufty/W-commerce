@@ -7,6 +7,7 @@ export const ROUTES = {
   MESSAGES: '/messages',
   PRODUCT: '/product/:id',
   PAYAI: '/payai',
+  SCAN: '/scan',
   
   // Auth
   LOGIN: '/login',

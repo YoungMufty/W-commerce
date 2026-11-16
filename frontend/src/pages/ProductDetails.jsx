@@ -4,9 +4,10 @@ import toast from 'react-hot-toast';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { apiClient as axios } from '@/utils/apiClient';
 import DOMPurify from 'dompurify';
-import { Settings, Package, CheckCircle2, Ruler, AlertTriangle, Sparkles, Brain } from 'lucide-react';
+import { Settings, Package, CheckCircle2, Ruler, AlertTriangle, Sparkles, Brain, QrCode } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import { useAuthStore } from '../store/authStore';
+import { useQRStore } from '../store/qrStore';
 import BanningRateCard from '../components/storefront/BanningRateCard';
 import { useCartStore } from '../store/cartStore';
 import { celebrate } from '../components/visual/CelebrationController';
@@ -88,6 +89,7 @@ const ProductDetails = () => {
 
   const [isHovered, setIsHovered] = useState(false);
   const { user } = useAuthStore();
+  const { openShare } = useQRStore();
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isThumbnailsExpanded, setIsThumbnailsExpanded] = useState(false);
 
@@ -959,6 +961,22 @@ const ProductDetails = () => {
                     }
                   }} className="flex-1 neu-button py-4 font-bold rounded flex items-center justify-center gap-2 text-sm">
                     <span className="text-xl emoji-icon">📤</span> Share
+                  </button>
+                  <button 
+                    onClick={() => openShare({
+                      type: 'product',
+                      id: product.id,
+                      title: product.title,
+                      subtitle: product.store?.storeName ? `Sold by ${product.store.storeName}` : 'Verified W-Commerce Product',
+                      amount: product.price,
+                      currency: product.currency || 'NGN',
+                      storeName: product.store?.storeName,
+                      imageUrl: product.images?.[0]?.url || product.imageUrl
+                    })}
+                    className="flex-1 neu-button py-4 font-bold rounded flex items-center justify-center gap-2 text-sm text-blue-600 dark:text-blue-400"
+                    title="Share via QR Code"
+                  >
+                    <QrCode size={18} /> QR Pass
                   </button>
                   <button onClick={handleWishlist} className="flex-1 neu-button py-4 font-bold rounded flex items-center justify-center gap-2 text-sm">
                     <span className="text-xl emoji-icon">❤️</span> Wishlist

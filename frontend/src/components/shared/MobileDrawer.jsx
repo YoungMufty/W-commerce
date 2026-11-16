@@ -1,11 +1,13 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { X, User, ShoppingBag, Home, Search, Heart, Settings, MessageCircle, Sparkles } from 'lucide-react';
+import { X, User, ShoppingBag, Home, Search, Heart, Settings, MessageCircle, Sparkles, QrCode } from 'lucide-react';
 import { ROUTES } from '../../constants/routes';
+import { useQRStore } from '../../store/qrStore';
 import './MobileDrawer.css';
 
 const MobileDrawer = ({ isOpen, onClose, isAuthenticated, user, cartItemsCount }) => {
+  const { openScanner } = useQRStore();
   return (
     <AnimatePresence>
       {isOpen && (
@@ -49,6 +51,16 @@ const MobileDrawer = ({ isOpen, onClose, isAuthenticated, user, cartItemsCount }
                   AI
                 </span>
               </Link>
+              <button 
+                onClick={() => { onClose(); openScanner(); }} 
+                className="neu-link text-left w-full cursor-pointer text-[var(--text-main)]"
+              >
+                <QrCode size={20} className="shrink-0 text-blue-500" />
+                <span className="flex-1">Scan QR Code</span>
+                <span className="bg-blue-600/15 text-blue-600 dark:text-blue-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  SCAN
+                </span>
+              </button>
               <Link to="/cart" onClick={onClose} className="neu-link">
                 <ShoppingBag size={20} className="shrink-0" /> 
                 <span className="flex-1">Cart</span>

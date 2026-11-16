@@ -87,7 +87,10 @@ class ConfigValidator {
 
     validateFrontendUrl() {
         const isProduction = process.env.NODE_ENV === 'production';
-        const url = process.env.FRONTEND_URL || '';
+        let url = (process.env.FRONTEND_URL || '').trim().replace(/\/+$/, '');
+        if (url) {
+            process.env.FRONTEND_URL = url;
+        }
 
         if (isProduction) {
             if (!url) {

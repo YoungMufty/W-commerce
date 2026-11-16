@@ -4,12 +4,13 @@ import {
   X, ExternalLink, Globe, ShieldCheck, ShoppingBag,
   Star, Plane, CheckCircle2, RefreshCw, ShoppingCart, Info, Store, Check,
   Heart, Share2, Sparkles, Clock, MapPin, Truck, Award, Box, ArrowRight,
-  Shield, Search, ChevronRight, Layers, FileCheck
+  Shield, Search, ChevronRight, Layers, FileCheck, QrCode
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { apiClient } from '../../utils/apiClient';
 import { decodeHtml, resolveProductImage } from '../../utils/imageHelpers';
 import StoreLogoAvatar from './StoreLogoAvatar';
+import { useQRStore } from '../../store/qrStore';
 
 // Variable height patterns matching Image 2 editorial masonry layout
 const HEIGHT_PATTERNS = [

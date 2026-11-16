@@ -176,3 +176,4 @@ startServerWithErrorHandling().catch((error) => {
     process.exit(1);
 });
 // restarted
+module.exports = app;

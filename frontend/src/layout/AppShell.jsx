@@ -5,6 +5,8 @@ import Navbar from '../components/shared/Navbar';
 import BottomNav from '../components/shared/BottomNav';
 import OfflineBanner from '../components/shared/OfflineBanner';
 import QlooAssistPopup from '../components/shared/QlooAssistPopup';
+import QRScanModal from '../components/qr/QRScanModal';
+import QRShareModal from '../components/qr/QRShareModal';
 import { WPageTransition } from '../components/motion/WPageTransition';
 import { notificationService } from '../services/notificationService';
 import { useAuthStore } from '../store/authStore';
@@ -49,6 +51,8 @@ export const AppShell = ({ children, className = '' }) => {
         </motion.div>
       </AnimatePresence>
       <BottomNav />
+      <QRScanModal />
+      <QRShareModal />
       <QlooAssistPopup />
     </div>
   );
