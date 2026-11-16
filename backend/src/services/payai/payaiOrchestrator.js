@@ -12,7 +12,7 @@ const aiService = require('../aiService');
 const qlooAgentTool = require('./qlooAgentTool');
 const qlooSourcingAssistant = require('./qlooSourcingAssistant');
 const { buildExternalMarketplaceLinks, formatExternalSourcingMarkdown } = require('./externalSourcingHelper');
-const { resolveBackendProductImage, convertVideoToImageUrl, isVideoUrl } = require('../../utils/productImageHelper');
+const { resolveBackendProductImage, convertVideoToImageUrl, isVideoUrl, repairMarkdownImagesLineBased } = require('../../utils/productImageHelper');
 
 // Returns a safe image URL — converts video URLs to thumbnails so the AI never embeds .mp4 links
 function safeImageUrl(item) {
@@ -318,16 +318,19 @@ class PayAIOrchestrator {
       assistantResponse = `I encountered an issue executing that request: ${err.message}. Please try again or refine your query.`;
     }
 
-    // Ensure all markdown images in assistant response use image URLs instead of raw video URLs
-    if (assistantResponse && typeof assistantResponse === 'string' && assistantResponse.includes('![')) {
-      assistantResponse = assistantResponse.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (fullMatch, alt, url) => {
-        const cleanUrl = (url || '').trim();
-        if (isVideoUrl(cleanUrl)) {
-          const imgUrl = convertVideoToImageUrl(cleanUrl) || resolveBackendProductImage({ title: alt }, '');
-          if (imgUrl) return `![${alt}](${imgUrl})`;
-        }
-        return fullMatch;
-      });
+    // Ensure all markdown images in assistant response use image URLs instead of raw video URLs and repair broken/truncated image tags
+    if (assistantResponse && typeof assistantResponse === 'string') {
+      assistantResponse = repairMarkdownImagesLineBased(assistantResponse);
+      if (assistantResponse.includes('![')) {
+        assistantResponse = assistantResponse.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (fullMatch, alt, url) => {
+          const cleanUrl = (url || '').trim();
+          if (isVideoUrl(cleanUrl)) {
+            const imgUrl = convertVideoToImageUrl(cleanUrl) || resolveBackendProductImage({ title: alt }, '');
+            if (imgUrl) return `![${alt}](${imgUrl})`;
+          }
+          return fullMatch;
+        });
+      }
     }
 
     // 3. Save assistant message and tool outputs
@@ -3895,10 +3898,23 @@ class PayAIOrchestrator {
       return { toolName: 'prepare_purchase_quote', toolArgs: {} };
     }
 
-    // Check if user is inquiring about recipe ingredients availability: e.g. "are all ingredient available in stock", "can i buy the ingredients"
+    // 1.458. Recipe, Culinary, Ingredients & Home Cooking Consultation
+    // e.g. "I have rice in my kitchen, list out all ingredient i need to get fried rice prepare for my breakfast", "how to cook jollof rice", "recipe for egusi soup"
+    const isExplicitStockAvailability = /\b(?:are\s+(?:all\s+|these\s+|the\s+)?ingredients?\s+available|ingredients?\s+(?:available\s+in\s+stock|in\s+stock|out\s+of\s+stock)|available\s+in\s+stock|in\s+stock|out\s+of\s+stock|can\s+i\s+(?:buy|purchase)\s+(?:all\s+|the\s+)?ingredients?|do\s+you\s+have\s+(?:all\s+|the\s+)?ingredients?)\b/i.test(lower);
+
+    const culinaryRecipePatterns = /\b(?:recipes?|how\s+(?:to|do\s+i|can\s+i)\s+(?:cook|prepare|make|fry|bake)|list\s+(?:out\s+)?(?:all\s+)?(?:the\s+)?ingredients?|what\s+ingredients?|in\s+my\s+kitchen|in\s+my\s+fridge|in\s+my\s+pantry|cook\s+(?:at\s+home|for\s+(?:breakfast|lunch|dinner|myself))|steps\s+to\s+(?:prepare|cook|make)|how\s+is\s+.+?\s+(?:prepared|cooked|made)|guide\s+to\s+(?:cook|prepare|make))\b/i;
+
+    if (culinaryRecipePatterns.test(lower) && !isExplicitStockAvailability) {
+      return {
+        toolName: 'advise_culinary_recipe',
+        toolArgs: { prompt: text }
+      };
+    }
+
+    // Check if user is inquiring about recipe ingredients availability: e.g. "are all ingredient available in stock", "can i buy the ingredients", "do you have the ingredients in stock"
     const isIngredientStockQuery =
       /\b(?:ingredients?|recipe\s+items?|cooking\s+items?|raw\s+items?|spices?)\b/i.test(lower) &&
-      /\b(?:in\s+stock|available|out\s+of\s+stock|remain|left|buy|get|have\s+(?:them|these|all|any)|purchase|where|can\s+i|all\s+ingredient)\b/i.test(lower);
+      /\b(?:in\s+stock|available|out\s+of\s+stock|remain|left|buy|purchase|where\s+can\s+i\s+buy|do\s+you\s+have\s+(?:them|these|all|any)|can\s+i\s+(?:buy|get|purchase)|available\s+in\s+stock|available\s+in\s+w-commerce)\b/i.test(lower);
 
     if (isIngredientStockQuery) {
       return {
@@ -4022,16 +4038,6 @@ class PayAIOrchestrator {
     if (conversationalFoodPatterns.test(lower)) {
       return {
         toolName: 'advise_food',
-        toolArgs: { prompt: text }
-      };
-    }
-
-    // 1.458. Recipe, Culinary, Ingredients & Home Cooking Consultation
-    // e.g. "I have rice in my kitchen, list out all ingredient i need to get fried rice prepare for my breakfast", "how to cook jollof rice", "recipe for egusi soup"
-    const culinaryRecipePatterns = /\b(?:recipe|recipes|ingredient|ingredients|how\s+(?:to|do\s+i|can\s+i)s+(?:cook|prepare|make|fry|bake)|list\s+(?:out\s+)?(?:all\s+)?(?:the\s+)?ingredients?|what\s+ingredients?|in\s+my\s+kitchen|in\s+my\s+fridge|in\s+my\s+pantry|cook\s+(?:at\s+home|for\s+(?:breakfast|lunch|dinner|myself))|steps\s+to\s+(?:prepare|cook|make)|how\s+is\s+.+?\s+(?:prepared|cooked|made)|guide\s+to\s+(?:cook|prepare|make))\b/i;
-    if (culinaryRecipePatterns.test(lower)) {
-      return {
-        toolName: 'advise_culinary_recipe',
         toolArgs: { prompt: text }
       };
     }

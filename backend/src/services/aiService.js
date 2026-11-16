@@ -2,7 +2,7 @@ const https = require('https');
 const axios = require('axios');
 const logger = require('../utils/logger');
 const prisma = require('../utils/prismaClient');
-const { resolveBackendProductImage } = require('../utils/productImageHelper');
+const { resolveBackendProductImage, repairMarkdownImagesLineBased } = require('../utils/productImageHelper');
 
 const httpsAgent = new https.Agent({
     keepAlive: false,
@@ -1028,7 +1028,7 @@ function buildGeminiPayload(messages, liveContext, isJsonPrompt = false) {
         contents,
         generationConfig: {
             temperature: isJsonPrompt ? 0.3 : 0.65,
-            maxOutputTokens: 1024
+            maxOutputTokens: 2048
         }
     };
 
@@ -1045,7 +1045,8 @@ exports.generateChatResponse = async (messages, options = {}) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey || apiKey.startsWith('REPLACE_') || apiKey === 'YOUR_GEMINI_API_KEY') {
         logger.debug('GEMINI_API_KEY not configured; using contextual assistant response.');
-        return options.fallbackReply || await buildIntelligentReply(lastMsg, '', options);
+        const raw = options.fallbackReply || await buildIntelligentReply(lastMsg, '', options);
+        return repairMarkdownImagesLineBased(raw);
     }
 
     const liveContext = isJsonPrompt
@@ -1064,7 +1065,7 @@ exports.generateChatResponse = async (messages, options = {}) => {
                 .trim();
 
             if (text) {
-                return text;
+                return repairMarkdownImagesLineBased(text);
             }
         } catch (error) {
             const status = error.response?.status;
@@ -1077,7 +1078,8 @@ exports.generateChatResponse = async (messages, options = {}) => {
         }
     }
 
-    return options.fallbackReply || await buildIntelligentReply(lastMsg, liveContext, options);
+    const fallback = options.fallbackReply || await buildIntelligentReply(lastMsg, liveContext, options);
+    return repairMarkdownImagesLineBased(fallback);
 };
 
 /**
@@ -1091,8 +1093,9 @@ exports.streamChatResponse = async (messages, options = {}, onChunk) => {
 
     if (!apiKey || apiKey.startsWith('REPLACE_') || apiKey === 'YOUR_GEMINI_API_KEY') {
         const fallback = options.fallbackReply || await buildIntelligentReply(lastMsg, '', options);
-        if (onChunk) onChunk(fallback);
-        return fallback;
+        const safeFallback = repairMarkdownImagesLineBased(fallback);
+        if (onChunk) onChunk(safeFallback);
+        return safeFallback;
     }
 
     const liveContext = await buildLiveMarketplaceContext(lastMsg, options.user, options.extraContext, options);
@@ -1141,7 +1144,7 @@ exports.streamChatResponse = async (messages, options = {}, onChunk) => {
             });
 
             if (fullText.trim()) {
-                return fullText.trim();
+                return repairMarkdownImagesLineBased(fullText.trim());
             }
         } catch (error) {
             const status = error.response?.status;
@@ -1150,6 +1153,7 @@ exports.streamChatResponse = async (messages, options = {}, onChunk) => {
     }
 
     const fallback = options.fallbackReply || await buildIntelligentReply(lastMsg, liveContext, options);
-    if (onChunk) onChunk(fallback);
-    return fallback;
+    const safeFallback = repairMarkdownImagesLineBased(fallback);
+    if (onChunk) onChunk(safeFallback);
+    return safeFallback;
 };

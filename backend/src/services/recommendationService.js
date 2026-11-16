@@ -251,25 +251,27 @@ class RecommendationService {
         return categoryScore + (tagScore * 5) + groupScore + skuScore + ratingBonus + deliveryBonus + flashBonus;
     }
 
-    static async getRecommendations(userId, browsingHistory = [], limit = 8, cartProductIds = []) {
+    static async getRecommendations(userId, browsingHistory = [], limit = 8, cartProductIds = [], targetCategory = null) {
         try {
             const signals = await this.getRecommendationSignals(userId, browsingHistory, cartProductIds);
-            const preferredCategories = [...signals.categoryWeights.entries()]
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 5)
-                .map(([category]) => category);
+            const preferredCategories = targetCategory
+                ? [targetCategory]
+                : [...signals.categoryWeights.entries()]
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 5)
+                    .map(([category]) => category);
 
             const products = await prisma.product.findMany({
                 where: {
                     stock: { gt: 0 }, store: { approvalStatus: 'APPROVED' }, isArchived: false,
                     ...(signals.excludeIds.size > 0 ? { id: { notIn: [...signals.excludeIds] } } : {}),
-                    ...(preferredCategories.length > 0 ? {
+                    ...(targetCategory ? { category: targetCategory } : (preferredCategories.length > 0 ? {
                         OR: [
                             { category: { in: preferredCategories } },
                             { productGroupId: { in: [...signals.productGroupIds] } },
                             { sku: { in: [...signals.skus] } }
                         ]
-                    } : {})
+                    } : {}))
                 },
                 include: baseInclude(),
                 take: Math.max(limit * 3, 12),
@@ -288,10 +290,14 @@ class RecommendationService {
                 .sort((a, b) => b.score - a.score)
                 .slice(0, limit);
 
+            if (ranked.length === 0 && targetCategory) {
+                return this.getFallbackRecommendations(limit, targetCategory);
+            }
+
             return ranked;
         } catch (error) {
             logger.error(`Recommendation service getRecommendations error: ${error.message}`);
-            return this.getFallbackRecommendations(limit);
+            return this.getFallbackRecommendations(limit, targetCategory);
         }
     }
 
@@ -520,26 +526,39 @@ class RecommendationService {
     }
 
     static async getRecommendationBundle(productId, userId = null, browsingHistory = [], cartProductIds = []) {
+        const referenceProduct = await prisma.product.findUnique({
+            where: { id: productId },
+            select: { category: true }
+        });
+        const productCategory = referenceProduct?.category || null;
+
         const [comparison, similarProducts, complementaryItems, personalized] = await Promise.all([
             this.getComparison(productId),
             this.getSimilarProducts(productId, 10),
             this.getPeopleAlsoBought(productId, 10),
-            this.getRecommendations(userId, browsingHistory, 10, cartProductIds)
+            this.getRecommendations(userId, browsingHistory, 10, cartProductIds, productCategory)
         ]);
+
+        const otherSellersList = comparison?.products?.filter((product) => product.id !== productId) || [];
 
         return {
             comparison,
-            otherSellers: comparison?.products?.filter((product) => product.id !== productId) || [],
+            otherSellers: otherSellersList,
+            alternatives: otherSellersList,
             similarProducts,
+            similar: similarProducts,
             complementaryItems,
-            personalized
+            peopleAlsoBought: complementaryItems,
+            personalized,
+            recommended: similarProducts.length > 0 ? similarProducts : personalized
         };
     }
 
-    static async getFallbackRecommendations(limit = 8) {
+    static async getFallbackRecommendations(limit = 8, targetCategory = null) {
         const products = await prisma.product.findMany({
             where: {
-                stock: { gt: 0 }, store: { approvalStatus: 'APPROVED' }, isArchived: false
+                stock: { gt: 0 }, store: { approvalStatus: 'APPROVED' }, isArchived: false,
+                ...(targetCategory ? { category: targetCategory } : {})
             },
             include: baseInclude(),
             take: limit,
@@ -548,6 +567,11 @@ class RecommendationService {
                 { createdAt: 'desc' }
             ]
         });
+
+        // If category filter returned empty, try broad fallback without category
+        if (products.length === 0 && targetCategory) {
+            return this.getFallbackRecommendations(limit, null);
+        }
 
         return products.map((product) => ({
             ...decorateProduct(product),

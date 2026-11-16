@@ -156,6 +156,7 @@ class MessagingService {
             orderId = null,
             quotedMsg = null,
             productContext = null,
+            orderContext = null,
             isSystemMessage = false,
             isAutoReply = false
         } = payload;
@@ -181,7 +182,8 @@ class MessagingService {
         const responseTimeMinutes = await this.updateSellerResponseMetrics(sender, conversation.id, now);
         const metadata = JSON.stringify({
             quotedMsg: quotedMsg || null,
-            productContext: productContext || null
+            productContext: productContext || null,
+            orderContext: orderContext || null
         });
 
         const message = await prisma.message.create({
@@ -212,7 +214,23 @@ class MessagingService {
                     }
                 },
                 order: {
-                    select: { id: true, status: true }
+                    select: {
+                        id: true,
+                        status: true,
+                        totalAmount: true,
+                        currency: true,
+                        items: {
+                            include: {
+                                product: {
+                                    include: {
+                                        images: {
+                                            select: { url: true, isPrimary: true }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         });
@@ -279,6 +297,63 @@ class MessagingService {
 
     normalizeMessage(message) {
         const metadata = safeJsonParse(message.metadata);
+        let orderPreview = metadata?.orderContext || null;
+
+        if (message.order) {
+            const firstItem = message.order.items?.[0];
+            const firstProduct = firstItem?.product;
+            const primaryImage = firstProduct?.images?.find(img => img.isPrimary)?.url || firstProduct?.images?.[0]?.url || null;
+
+            const hex = message.order.id ? message.order.id.replace(/[^A-Za-z0-9]/g, '').slice(-8).toUpperCase() : '';
+            const generatedOrderNum = hex ? `#W-DOM-${hex}` : (message.order.id ? `#${message.order.id.slice(0, 8)}` : null);
+
+            orderPreview = {
+                id: message.order.id,
+                orderNumber: orderPreview?.orderNumber || generatedOrderNum,
+                status: message.order.status || 'PAID',
+                totalAmount: message.order.totalAmount,
+                currency: message.order.currency || 'NGN',
+                productTitle: firstProduct?.title || orderPreview?.productTitle || null,
+                productImage: primaryImage || orderPreview?.productImage || null,
+                quantity: firstItem?.quantity || orderPreview?.quantity || 1,
+                priceAtTime: firstItem?.priceAtTime || orderPreview?.productPrice || null,
+                items: (message.order.items || []).map(it => ({
+                    id: it.id,
+                    productId: it.productId,
+                    title: it.product?.title,
+                    image: it.product?.images?.find(img => img.isPrimary)?.url || it.product?.images?.[0]?.url || null,
+                    quantity: it.quantity,
+                    priceAtTime: it.priceAtTime
+                }))
+            };
+        } else if (orderPreview) {
+            if (!orderPreview.id && message.orderId) {
+                orderPreview.id = message.orderId;
+            }
+        } else if (message.orderId) {
+            const hex = message.orderId.replace(/[^A-Za-z0-9]/g, '').slice(-8).toUpperCase();
+            orderPreview = {
+                id: message.orderId,
+                orderNumber: hex ? `#W-DOM-${hex}` : `#${message.orderId.slice(0, 8)}`,
+                status: 'PAID'
+            };
+        }
+
+        // Also check if content has Order Inquiry pattern:
+        // e.g. 📦 **[Order Inquiry: #W-DOM-0256F47A (#670b1391)]**
+        if (!orderPreview && typeof message.content === 'string') {
+            const match = message.content.match(/\[Order Inquiry:\s*#?([A-Za-z0-9_-]+)(?:\s*\((#?[A-Za-z0-9_-]+)\))?\]/i);
+            if (match) {
+                const orderNum = match[1];
+                const rawId = match[2] ? match[2].replace(/^#/, '') : (message.orderId || null);
+                orderPreview = {
+                    id: rawId || orderNum,
+                    orderNumber: orderNum.startsWith('#') ? orderNum : `#${orderNum}`,
+                    status: 'INQUIRY'
+                };
+            }
+        }
+
         return {
             id: message.id,
             conversationId: message.conversationId,
@@ -294,15 +369,13 @@ class MessagingService {
             timestamp: toISO(message.createdAt),
             quotedMsg: metadata.quotedMsg || null,
             productContext: metadata.productContext || null,
+            orderId: message.orderId || orderPreview?.id || null,
             productPreview: message.product ? {
                 id: message.product.id,
                 title: message.product.title,
                 image: message.product.images?.[0]?.url || null
             } : null,
-            orderPreview: message.order ? {
-                id: message.order.id,
-                status: message.order.status
-            } : null,
+            orderPreview,
             isSystemMessage: Boolean(message.isSystemMessage),
             isAutoReply: Boolean(message.isAutoReply),
             responseTimeMinutes: message.responseTimeMinutes || null
@@ -439,7 +512,23 @@ class MessagingService {
                     }
                 },
                 order: {
-                    select: { id: true, status: true }
+                    select: {
+                        id: true,
+                        status: true,
+                        totalAmount: true,
+                        currency: true,
+                        items: {
+                            include: {
+                                product: {
+                                    include: {
+                                        images: {
+                                            select: { url: true, isPrimary: true }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             },
             orderBy: { createdAt: 'asc' }

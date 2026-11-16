@@ -464,7 +464,7 @@ function MarkdownContent({ content, onAction, isSending = false }) {
         if (!src) return null;
 
         const isVideo = isVideoUrl(src);
-        const effectiveSrc = isVideo ? getImageUrl(src) : (convertVideoToImageUrl(src) || resolveProductImage(null, alt));
+        const effectiveSrc = isVideo ? getImageUrl(src) : resolveProductImage(src, alt);
         return (
           <span key={pIdx} className="block my-2 max-w-sm rounded-xl overflow-hidden border border-slate-200 dark:border-zinc-700/60 shadow-sm bg-slate-50 dark:bg-zinc-800/50 group">
             {isVideo ? (
@@ -482,7 +482,7 @@ function MarkdownContent({ content, onAction, isSending = false }) {
                 className="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-300"
                 onError={(e) => {
                   e.currentTarget.onerror = null;
-                  e.currentTarget.src = convertVideoToImageUrl(src) || resolveProductImage(null, alt);
+                  e.currentTarget.src = resolveProductImage(null, alt);
                 }}
               />
             )}
@@ -765,7 +765,7 @@ function MarkdownContent({ content, onAction, isSending = false }) {
       const src = imgLineMatch[2]?.trim() || '';
       if (src) {
         const isVideo = isVideoUrl(src);
-        const effectiveSrc = isVideo ? getImageUrl(src) : (convertVideoToImageUrl(src) || resolveProductImage(null, alt));
+        const effectiveSrc = isVideo ? getImageUrl(src) : resolveProductImage(src, alt);
         elements.push(
           <div key={`img-${keyIdx++}`} className="my-2 max-w-sm rounded-xl overflow-hidden border border-slate-200 dark:border-zinc-700/60 shadow-sm bg-slate-50 dark:bg-zinc-800/50 group">
             {isVideo ? (
@@ -783,7 +783,7 @@ function MarkdownContent({ content, onAction, isSending = false }) {
                 className="w-full h-44 object-cover group-hover:scale-105 transition-transform duration-300"
                 onError={(e) => {
                   e.currentTarget.onerror = null;
-                  e.currentTarget.src = convertVideoToImageUrl(src) || resolveProductImage(null, alt);
+                  e.currentTarget.src = resolveProductImage(null, alt);
                 }}
               />
             )}

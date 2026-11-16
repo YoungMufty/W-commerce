@@ -170,6 +170,29 @@ class SellerExternalSiteService {
   _decodeHtml(text) {
     if (!text || typeof text !== 'string') return '';
     return text
+      .replace(/&#(\d+);/g, (_, dec) => {
+        const code = Number(dec);
+        if (code === 8243) return '″';
+        if (code === 8242) return '′';
+        if (code === 8211) return '–';
+        if (code === 8212) return '—';
+        if (code === 8216 || code === 8217) return "'";
+        if (code === 8220 || code === 8221) return '"';
+        if (code === 8230) return '…';
+        if (code === 8358) return '₦';
+        try {
+          return String.fromCharCode(code);
+        } catch (_) {
+          return '';
+        }
+      })
+      .replace(/&#x([0-9a-f]+);/gi, (_, hex) => {
+        try {
+          return String.fromCharCode(parseInt(hex, 16));
+        } catch (_) {
+          return '';
+        }
+      })
       .replace(/&amp;/gi, '&')
       .replace(/&lt;/gi, '<')
       .replace(/&gt;/gi, '>')

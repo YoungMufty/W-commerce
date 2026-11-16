@@ -2706,13 +2706,37 @@ class PayAIOrderService {
     const cleanInquiry = (message && message.trim()) || 'Hello! I am checking on the fulfillment and delivery status of my order. Could you please provide an estimated arrival update? Thank you!';
     const inquiryContent = `📦 **[Order Inquiry: #${displayOrderNum}]**\n${cleanInquiry}`;
 
+    // Extract first item & product info for rich preview
+    const firstItem = Array.isArray(targetOrder.items) && targetOrder.items.length > 0 ? targetOrder.items[0] : null;
+    const targetProduct = firstItem?.product || null;
+    const targetProductId = firstItem?.productId || targetProduct?.id || null;
+    const targetProductTitle = targetProduct?.title || firstItem?.title || null;
+    const targetProductImage = firstItem?.imageUrl || (targetProduct?.images?.find(i => i.isPrimary)?.url || targetProduct?.images?.[0]?.url) || null;
+    const targetProductPrice = firstItem?.price || firstItem?.priceAtTime || targetProduct?.price || null;
+
+    const orderContext = {
+      orderId: orderDbId,
+      orderNumber: displayOrderNum.startsWith('#') ? displayOrderNum : `#${displayOrderNum}`,
+      status: targetOrder.status || targetOrder.fulfillmentStatus || 'PROCESSING',
+      totalAmount: targetOrder.totalAmount || targetOrder.grandTotal || null,
+      currency: targetOrder.currency || 'NGN',
+      productId: targetProductId,
+      productTitle: targetProductTitle,
+      productImage: targetProductImage,
+      productPrice: targetProductPrice,
+      quantity: firstItem?.quantity || 1
+    };
+
     // 4. Send Message via MessagingService (persists Conversation + Message)
     const messagingService = require('../messagingService');
     const sentResult = await messagingService.sendMessage({
       senderId: buyerId,
       receiverId: sellerId,
       content: inquiryContent,
+      productId: targetProductId,
       orderId: orderDbId,
+      productContext: targetProductTitle,
+      orderContext,
       isSystemMessage: false
     });
 

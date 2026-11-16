@@ -700,18 +700,22 @@ function getCategoryIcon(cat) {
 // Get Personalized Recommendations ("For You")
 exports.getRecommendations = async (req, res) => {
     try {
-        const { history, cart } = req.query; // Comma-separated product IDs
+        const { history, cart, category, productId } = req.query; // Comma-separated product IDs or filters
         const userId = resolveOptionalUserId(req);
         const limit = parseInt(req.query.limit) || 8;
 
         const browsingHistory = parseIdList(history);
+        if (productId && !browsingHistory.includes(productId)) {
+            browsingHistory.unshift(productId);
+        }
         const cartProductIds = parseIdList(cart);
 
         const recommendations = await RecommendationService.getRecommendations(
             userId,
             browsingHistory,
             limit,
-            cartProductIds
+            cartProductIds,
+            category ? String(category).trim() : null
         );
 
         res.json({ success: true, recommendations });
