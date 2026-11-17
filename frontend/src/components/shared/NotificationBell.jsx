@@ -246,57 +246,60 @@ const NotificationBell = () => {
         )}
       </button>
 
-      {/* Sidebar Panel Portal */}
+      {/* Bottom Sheet Modal Portal (Slide from bottom) */}
       {typeof document !== 'undefined' && createPortal(
         <AnimatePresence>
           {isOpen && (
-            <div key="notif-panel">
-              {/* Overlay */}
+            <div 
+              key="notif-panel-container"
+              className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-sm transition-opacity"
+              onClick={() => setIsOpen(false)}
+            >
               <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setIsOpen(false)}
-                className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[900]"
-              />
-              
-              <motion.div 
-                initial={{ opacity: 0, x: '100%' }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: '100%' }}
-                transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-                className="fixed right-0 top-0 w-80 md:w-96 h-screen z-[1000] bg-[var(--bg-secondary)] border-l border-[var(--accent-gray)] shadow-[-10px_0_40px_rgba(0,0,0,0.6)] overflow-hidden flex flex-col"
+                initial={{ y: '100%', opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: '100%', opacity: 0 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className="w-full sm:max-w-xl md:max-w-2xl bg-[var(--bg-secondary)] border-t sm:border border-[var(--border-color)] rounded-t-3xl sm:rounded-3xl shadow-2xl relative max-h-[85vh] sm:max-h-[88vh] overflow-hidden flex flex-col"
+                onClick={(e) => e.stopPropagation()}
               >
+                {/* Drag Handle indicator on mobile (matches Banning Rate bottom sheet) */}
+                <div className="w-12 h-1.5 bg-[var(--text-muted)]/20 dark:bg-white/20 rounded-full mx-auto mt-3 mb-1 sm:hidden shrink-0" />
+
                 {/* Header */}
-                <div className="flex flex-col border-b border-[var(--accent-gray)] shadow-[0_2px_10px_var(--accent-gray-dim)] flex-shrink-0">
-                  <div className="flex items-center justify-between px-5 py-4">
+                <div className="flex flex-col border-b border-[var(--border-color)] flex-shrink-0">
+                  <div className="flex items-center justify-between px-5 py-3 sm:py-4">
                     <div className="flex items-center gap-2">
-                      <Bell size={18} className="text-[var(--accent-gray)]" />
-                      <h3 className="font-black text-xl text-black">Notifications</h3>
-                      {unread > 0 && <span className="px-2 py-0.5 bg-[var(--accent-gray)] text-black text-xs font-extrabold rounded-full">{unread}</span>}
+                      <Bell size={20} className="text-[var(--accent-gray)]" />
+                      <h3 className="font-black text-lg sm:text-xl text-[var(--text-main)]">Notifications</h3>
+                      {unread > 0 && <span className="px-2.5 py-0.5 bg-[var(--accent-gray)] text-black text-xs font-extrabold rounded-full">{unread}</span>}
                     </div>
-                    <button onClick={() => setIsOpen(false)} className="p-2 rounded-full hover:bg-[var(--bg-tertiary)] transition-colors text-[var(--text-muted)] hover:text-black">
-                      <X size={20} />
+                    <button 
+                      onClick={() => setIsOpen(false)} 
+                      className="w-8 h-8 rounded-full bg-[var(--bg-tertiary)] hover:bg-[var(--accent-gray)]/20 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
+                      aria-label="Close notifications"
+                    >
+                      <X size={18} />
                     </button>
                   </div>
-                  <div className="px-5 pb-4 flex gap-2">
-                    <button onClick={markAllRead} className="flex-1 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--accent-gray)]/20 border border-[var(--accent-gray)] rounded-xl text-sm font-bold text-black transition-colors flex items-center justify-center gap-2">
+                  <div className="px-5 pb-3 sm:pb-4 flex gap-2">
+                    <button onClick={markAllRead} className="flex-1 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--accent-gray)]/20 border border-[var(--border-color)] rounded-xl text-sm font-bold text-[var(--text-main)] transition-colors flex items-center justify-center gap-2">
                       <CheckCheck size={16} /> Mark all read
                     </button>
                     {!initiallyGranted && typeof window !== 'undefined' && 'Notification' in window && (
                       hasPushPermission ? (
-                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex-1 py-2 bg-green-50 border border-green-200 rounded-xl text-sm font-bold text-green-600 transition-colors flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(74,222,128,0.2)]">
+                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex-1 py-2 bg-green-500/10 border border-green-500/30 rounded-xl text-sm font-bold text-green-600 dark:text-green-400 transition-colors flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(74,222,128,0.15)]">
                           <CheckCheck size={16} /> Push Enabled!
                         </motion.div>
                       ) : (
                         <button 
                           onClick={requestPushPermission} 
                           disabled={isRequestingPush}
-                          className="flex-1 py-2 bg-green-100 hover:bg-green-200 disabled:opacity-60 border border-green-300 rounded-xl text-sm font-bold text-green-800 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                          className="flex-1 py-2 bg-green-500/10 hover:bg-green-500/20 disabled:opacity-60 border border-green-500/30 rounded-xl text-sm font-bold text-green-700 dark:text-green-400 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
                         >
                           {isRequestingPush ? (
                             <>
-                              <div className="w-4 h-4 border-2 border-green-800 border-t-transparent rounded-full animate-spin" />
+                              <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
                               <span>Enabling...</span>
                             </>
                           ) : (
@@ -312,7 +315,7 @@ const NotificationBell = () => {
                 </div>
 
                 {/* List */}
-                <div className="overflow-y-auto flex-1">
+                <div className="overflow-y-auto flex-1 pb-6">
                   {isLoading ? (
                     <div className="flex items-center justify-center h-32">
                       <div className="w-6 h-6 border-2 border-[var(--accent-gray)] border-t-transparent rounded-full animate-spin" />
