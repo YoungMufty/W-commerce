@@ -1100,9 +1100,9 @@ const Messages = () => {
         </div>
 
         {/* Chat Area & Info Panel Container */}
-        <div id="debug-parent" className={`w-full md:flex-1 flex gap-0 md:gap-6 overflow-hidden shrink-0 absolute md:static top-0 left-0 h-full transition-transform duration-300 z-30 ${activeChat ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}`}>
+        <div id="debug-parent" className={`w-full md:flex-1 min-w-0 flex gap-0 md:gap-6 overflow-hidden shrink-0 absolute md:static top-0 left-0 h-full transition-transform duration-300 z-30 ${activeChat ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}`}>
            {/* Main Chat Area */}
-        <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 absolute md:static top-0 left-0 w-full h-full z-10 ${activeChat ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}`}>
+        <div className={`flex-1 min-w-0 flex flex-col overflow-hidden transition-all duration-300 absolute md:static top-0 left-0 w-full h-full z-10 ${activeChat ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}`}>
              {/* Removed glow */}
                  {activeChat ? (
                <>
