@@ -163,3 +163,63 @@ export function resolveProductImage(productOrUrl, title = '', category = '') {
   // High quality neutral retail order packaging default instead of random vegetables
   return FALLBACK_PACKAGE_BOX_IMG;
 }
+
+/**
+ * Identify the high-level retail domain of a product to prevent cross-domain mismatch
+ * (e.g. recommending fast food / soup for an interactive digital board or laptop).
+ */
+export function categorizeProductDomain(productOrCategory, title = '') {
+  let text = '';
+  if (productOrCategory && typeof productOrCategory === 'object') {
+    text = `${productOrCategory.category || ''} ${productOrCategory.title || productOrCategory.name || ''} ${productOrCategory.description || ''}`.toLowerCase();
+  } else {
+    text = `${productOrCategory || ''} ${title || ''}`.toLowerCase();
+  }
+
+  if (/\b(food|meal|meals|combo|combos|drink|drinks|beverage|beverages|snack|snacks|sauce|sauces|fries|burger|burgers|chicken|strips|pizza|soup|yam|catfish|pepper|tomato|tomatoes|onion|onions|vegetable|vegetables|groceries|grocery|rice|noodles|pasta|cereal|corn flakes|oats|porridge|biscuits|cookies|crisps|chips|dairy|milk|eggs|bakery|bread|beef|meat)\b/i.test(text)) {
+    return 'FOOD';
+  }
+
+  if (/\b(tech|electronic|electronics|gadget|gadgets|interactive board|digital board|smart board|board|screen|display|displays|tv|television|smart tv|monitor|monitors|computer|computers|laptop|laptops|phone|phones|smartphone|smartphones|tablet|audio|headphone|headphones|earbuds|smartwatch|smartwatches|charger|chargers|cables|playstation|ps5|console|quest|camera|oppo|samsung|hisense|huawei|yealink|dell|riversong|vibe)\b/i.test(text)) {
+    return 'TECH';
+  }
+
+  if (/\b(fashion|apparel|clothing|clothes|wear|shirt|shirts|t-shirt|top|tops|blouse|blouses|dress|dresses|hoodie|hoodies|pants|shorts|jacket|jackets|leggings|sneaker|sneakers|shoes|shoe|activewear|gymshark|sportswear)\b/i.test(text)) {
+    return 'FASHION';
+  }
+
+  if (/\b(beauty|skincare|cosmetics|makeup|lotion|moisturiser|moisturizing|body wash|bath & body|shampoo|haircare|fragrance|perfume|oral care|toothpaste)\b/i.test(text)) {
+    return 'BEAUTY';
+  }
+
+  if (/\b(vitamin|vitamins|supplement|supplements|first aid|plaster|plasters|medical|bandage)\b/i.test(text)) {
+    return 'HEALTH';
+  }
+
+  if (/\b(baby|diaper|diapers|baby wipes|nappy|infant)\b/i.test(text)) {
+    return 'BABY';
+  }
+
+  if (/\b(furniture|couch|sofa|table|chair|bed|decor|lighting|kitchenware|cleaner|surface & floor cleaners|laundry care|laundry detergent)\b/i.test(text)) {
+    return 'HOME';
+  }
+
+  return 'OTHER';
+}
+
+/**
+ * Domain-compatibility guardrail: returns true only if two products belong to the same
+ * commercial domain (or at least one cannot be definitively restricted).
+ */
+export function isCategoryCompatible(prodA, prodB) {
+  if (!prodA || !prodB) return true;
+  const domA = categorizeProductDomain(prodA);
+  const domB = categorizeProductDomain(prodB);
+
+  // If both have identified domains and they don't match, strictly reject
+  if (domA !== 'OTHER' && domB !== 'OTHER') {
+    return domA === domB;
+  }
+  return true;
+}
+

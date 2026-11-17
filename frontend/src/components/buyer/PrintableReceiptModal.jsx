@@ -1,7 +1,10 @@
 import React from 'react';
-import { X, Printer, ShieldCheck } from 'lucide-react';
+import { X, Printer, ShieldCheck, QrCode } from 'lucide-react';
+import QRCode from 'react-qr-code';
+import { useQRStore } from '../../store/qrStore';
 
 const PrintableReceiptModal = ({ isOpen, onClose, order }) => {
+  const { openShare } = useQRStore();
   if (!isOpen || !order) return null;
 
   const handlePrint = () => {
@@ -56,6 +59,25 @@ const PrintableReceiptModal = ({ isOpen, onClose, order }) => {
             <ShieldCheck className="text-emerald-500" /> Secure Receipt
           </h3>
           <div className="flex items-center gap-2">
+            <button 
+              onClick={() => openShare({
+                type: 'receipt',
+                id: order.id,
+                title: `Receipt #${order.id.substring(0,8).toUpperCase()}`,
+                subtitle: `Amount: NGN ${parseFloat(order.totalAmount).toFixed(2)} • ${order.paymentMethod === 'direct_bank' ? 'Direct Bank Transfer' : order.paymentMethod || 'Escrow'}`,
+                amount: order.totalAmount,
+                currency: 'NGN',
+                status: 'PAID',
+                metadata: {
+                  buyer: buyerName,
+                  store: order.items?.[0]?.product?.store?.storeName || order.seller?.store?.storeName
+                }
+              })}
+              className="px-3 py-2 bg-emerald-600 text-white text-sm font-bold rounded shadow hover:bg-emerald-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Share Receipt via QR"
+            >
+              <QrCode size={16} /> Share QR
+            </button>
             <button 
               onClick={handlePrint}
               className="px-4 py-2 bg-[var(--text-main)] text-black text-sm font-bold rounded shadow hover:opacity-90 flex items-center gap-2 transition-opacity"
@@ -146,6 +168,21 @@ const PrintableReceiptModal = ({ isOpen, onClose, order }) => {
             </div>
           </div>
           
+          {/* QR Verification Seal for physical/digital receipt */}
+          <div className="flex items-center justify-between border-t border-gray-200 pt-6 mt-4">
+            <div className="text-left text-xs text-gray-500 max-w-xs">
+              <p className="font-bold text-gray-700 uppercase tracking-wider mb-1">Authenticity QR Verification</p>
+              <p>Scan with any camera or W-Commerce app to verify payment settlement and escrow status on the platform.</p>
+            </div>
+            <div className="p-2 bg-white rounded-xl border border-gray-300 shadow-sm">
+              <QRCode
+                value={`${typeof window !== 'undefined' ? window.location.origin : 'https://w-commerce.app'}/orders/${order.id}?view=receipt&qr_type=receipt`}
+                size={72}
+                level="M"
+              />
+            </div>
+          </div>
+
           <div className="text-center border-t border-gray-200 pt-8">
             <p className="text-sm text-gray-600 italic whitespace-pre-wrap">{receiptConfig.footerText}</p>
             <p className="text-xs text-gray-700 mt-4">This receipt was generated securely via GlobalX platform.</p>

@@ -16,10 +16,6 @@
     "frontend": {
       "root": "frontend",
       "framework": "vite"
-    },
-    "portfolio": {
-      "root": "ultra3pro-portfolio",
-      "framework": "vite"
     }
   },
   "rewrites": [

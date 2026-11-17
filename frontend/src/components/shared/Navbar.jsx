@@ -87,11 +87,11 @@ const Navbar = ({ onSearch, onCategorySelect }) => {
         <div className="flex gap-2 sm:gap-3 shrink-0 items-center justify-end flex-1">
           <Link
             to={ROUTES.PAYAI}
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-purple-600/10 hover:from-blue-600/20 hover:to-purple-600/20 text-blue-600 dark:text-blue-400 border border-blue-500/20 shadow-sm transition-all duration-200 shrink-0"
+            className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-bold text-xs bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-purple-600/10 hover:from-blue-600/20 hover:to-purple-600/20 text-blue-600 dark:text-blue-400 border border-blue-500/20 shadow-sm transition-all duration-200 shrink-0"
             title="PayAI Cross-Border International Shopping"
+            aria-label="PayAI Cross-Border International Shopping"
           >
             <Sparkles size={14} className="text-indigo-500 animate-pulse shrink-0" />
-            <span className="tracking-tight">PayAI Global</span>
             <span className="text-[9px] uppercase px-1 py-0.2 bg-blue-600 text-white rounded font-extrabold">NEW</span>
           </Link>
 

@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useBuyerStore } from '../../store/buyerStore';
-import { Package, Truck, Clock, MapPin, CheckCircle2, AlertCircle, ArrowLeft, Navigation, Phone, MessageCircle } from 'lucide-react';
+import { Package, Truck, Clock, MapPin, CheckCircle2, AlertCircle, ArrowLeft, Navigation, Phone, MessageCircle, QrCode } from 'lucide-react';
 import { format } from 'date-fns';
 import { MapView } from '../../maps/MapView';
 import { useTrackingStore } from '../../store/trackingStore';
+import { useQRStore } from '../../store/qrStore';
 import { isVideoUrl, getImageUrl } from '@/utils/imageHelpers';
 
 const fmt = (n) => Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -23,6 +24,7 @@ const OrderDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { fetchOrderById, isLoading } = useBuyerStore();
+  const { openShare } = useQRStore();
   const [order, setOrder] = useState(null);
   const [error, setError] = useState('');
   
@@ -86,8 +88,52 @@ const OrderDetail = () => {
           </h1>
           <p className="text-[var(--text-muted)] text-sm">Placed on {format(new Date(order?.createdAt || Date.now()), 'MMM dd, yyyy h:mm a')}</p>
         </div>
-        <div className={`px-4 py-2 rounded-full border font-sans font-bold tracking-widest uppercase text-xs ${getStatusColor(order.status)}`}>
-          {order.status}
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            onClick={() => openShare({
+              type: 'order',
+              id: order.id,
+              title: `Order #${order.orderNumber || order.id.slice(-8).toUpperCase()}`,
+              subtitle: `${order.items?.length || 1} Item(s) • Status: ${order.status}`,
+              amount: order.totalAmount,
+              currency: order.currency || 'NGN',
+              status: order.status,
+              metadata: {
+                paymentStatus: order.paymentStatus,
+                trackingNumber: order.trackingNumber
+              }
+            })}
+            className="px-4 py-2 rounded-xl text-xs font-bold border border-white/20 bg-white/10 hover:bg-white/20 flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-sm text-white"
+            title="Share Order QR Pass"
+          >
+            <QrCode size={14} className="text-amber-400" />
+            <span>Order QR Pass</span>
+          </button>
+
+          <button
+            onClick={() => openShare({
+              type: 'receipt',
+              id: order.id,
+              title: `Official Receipt #${order.id.slice(-8).toUpperCase()}`,
+              subtitle: `Total Paid: ${fmt(order.totalAmount)} ${order.currency || 'NGN'} • ${order.paymentMethod || 'Escrow'}`,
+              amount: order.totalAmount,
+              currency: order.currency || 'NGN',
+              status: order.paymentStatus || 'PAID',
+              metadata: {
+                paymentMethod: order.paymentMethod,
+                paidAt: order.updatedAt || order.createdAt
+              }
+            })}
+            className="px-4 py-2 rounded-xl text-xs font-bold border border-white/20 bg-white/10 hover:bg-white/20 flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-sm text-white"
+            title="Share Receipt QR Code"
+          >
+            <QrCode size={14} className="text-teal-400" />
+            <span>Receipt QR</span>
+          </button>
+
+          <div className={`px-4 py-2 rounded-full border font-sans font-bold tracking-widest uppercase text-xs ${getStatusColor(order.status)}`}>
+            {order.status}
+          </div>
         </div>
       </div>
 

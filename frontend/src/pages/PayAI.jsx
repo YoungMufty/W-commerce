@@ -6,15 +6,16 @@ import {
   Search, PackageCheck, Copy, Eye, Star, ShoppingBag, Link2, Tag, AlertTriangle, Store, Wallet, MessageSquarePlus, Compass,
   Lock, CreditCard, Camera, Mic, Volume2, Maximize2,
   PanelLeft, PanelLeftClose, Plus, Trash2, History, MessageSquare, User,
-  Receipt, Table, Calculator
+  Receipt, Table, Calculator, QrCode
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { apiClient } from '../utils/apiClient';
 import { useAuthStore } from '../store/authStore';
 import { useCartStore } from '../store/cartStore';
+import { useQRStore } from '../store/qrStore';
 import { getSocket, identifyUser } from '../lib/socketClient';
-import { decodeHtml, resolveProductImage, isVideoUrl, convertVideoToImageUrl, FALLBACK_PACKAGE_BOX_IMG } from '../utils/imageHelpers';
+import { decodeHtml, resolveProductImage, isVideoUrl, convertVideoToImageUrl, FALLBACK_PACKAGE_BOX_IMG, isCategoryCompatible } from '../utils/imageHelpers';
 import { PLACEHOLDER_IMAGE } from '../constants/placeholders';
 
 // Supporting Modular Components
@@ -961,6 +962,7 @@ export default function PayAI() {
   const [searchParams] = useSearchParams();
   const { user } = useAuthStore();
   const { addToCart, fetchCart: fetchAppCart, cartItems } = useCartStore();
+  const { openScanner } = useQRStore();
   
   // Navigation Tabs: 'chat', 'discover', 'tracking'
   const [activeTab, setActiveTab] = useState('chat');
@@ -1498,6 +1500,17 @@ export default function PayAI() {
         const itemId = quickViewItem.id || quickViewItem._id;
         const providerLower = (quickViewItem.provider || '').toLowerCase();
         const isExternal = ['amazon', 'aliexpress', 'ebay', 'asos'].includes(providerLower);
+        const itemCategory = quickViewItem.category || '';
+
+        const candidateMap = new Map();
+        const addCandidate = (prod) => {
+          if (!prod) return;
+          const pid = prod.id || prod._id;
+          if (!pid || pid === itemId || candidateMap.has(pid)) return;
+          if (isCategoryCompatible(quickViewItem, prod)) {
+            candidateMap.set(pid, prod);
+          }
+        };
 
         // 1. Try bundle endpoint if it's a native product with valid ID
         if (itemId && !isExternal) {
@@ -1505,75 +1518,93 @@ export default function PayAI() {
             const bundleRes = await apiClient.get(`/api/v1/products/${itemId}/bundle`);
             if (bundleRes.data?.success && bundleRes.data?.bundle) {
               const b = bundleRes.data.bundle;
-              const combined = [
-                ...(b.recommended || []),
+              const bundleItems = [
+                ...(b.similarProducts || []),
                 ...(b.similar || []),
+                ...(b.otherSellers || []),
+                ...(b.complementaryItems || []),
+                ...(b.recommended || []),
                 ...(b.peopleAlsoBought || []),
                 ...(b.alternatives || [])
-              ].filter(p => (p.id || p._id) !== itemId);
-
-              const unique = [];
-              const seen = new Set();
-              for (const p of combined) {
-                const pid = p.id || p._id;
-                if (pid && !seen.has(pid)) {
-                  seen.add(pid);
-                  unique.push(p);
-                }
-              }
-
-              if (unique.length > 0 && isSubscribed) {
-                setQuickViewRecommendations(unique.slice(0, 6));
-                setLoadingQuickViewRecommendations(false);
-                return;
-              }
+              ];
+              bundleItems.forEach(addCandidate);
             }
           } catch (e) {
-            // Bundle error, continue to general recommendations
+            // Bundle error, continue to category recommendations
           }
         }
 
-        // 2. Fetch general / personalized recommendations
-        try {
-          const recRes = await apiClient.get('/api/v1/products/recommendations?limit=8');
-          if (recRes.data?.success && Array.isArray(recRes.data?.recommendations) && recRes.data.recommendations.length > 0) {
-            const filtered = recRes.data.recommendations.filter(p => (p.id || p._id) !== itemId);
-            if (filtered.length > 0 && isSubscribed) {
-              setQuickViewRecommendations(filtered.slice(0, 6));
-              setLoadingQuickViewRecommendations(false);
-              return;
+        // 2. Fetch category-targeted recommendations
+        if (candidateMap.size < 6) {
+          try {
+            const recRes = await apiClient.get('/api/v1/products/recommendations', {
+              params: {
+                productId: itemId,
+                category: itemCategory,
+                limit: 10
+              }
+            });
+            if (recRes.data?.success && Array.isArray(recRes.data?.recommendations)) {
+              recRes.data.recommendations.forEach(addCandidate);
             }
+          } catch (e) {
+            // Continue
           }
-        } catch (e) {
-          // Continue to discoverItems fallback
         }
 
-        // 3. Fallback to discoverItems or products
-        if (discoverItems && discoverItems.length > 0) {
-          const categoryMatches = discoverItems.filter(p => {
-            if ((p.id || p._id) === itemId) return false;
-            if (quickViewItem.category && p.category && p.category.toLowerCase() === quickViewItem.category.toLowerCase()) return true;
-            return false;
-          });
-          const otherItems = discoverItems.filter(p => (p.id || p._id) !== itemId && !categoryMatches.includes(p));
-          const fallbackList = [...categoryMatches, ...otherItems].slice(0, 6);
-          if (isSubscribed) {
-            setQuickViewRecommendations(fallbackList);
-            setLoadingQuickViewRecommendations(false);
-            return;
+        // 3. Fallback direct category products query if still needed
+        if (candidateMap.size < 6 && itemCategory) {
+          try {
+            const catRes = await apiClient.get('/api/v1/products', {
+              params: {
+                category: itemCategory,
+                limit: 12
+              }
+            });
+            const list = catRes.data?.products || (Array.isArray(catRes.data) ? catRes.data : []);
+            list.forEach(addCandidate);
+          } catch (e) {
+            // Continue
           }
         }
+
+        // 4. Keyword search fallback if still sparse
+        if (candidateMap.size < 4 && quickViewItem.title) {
+          try {
+            const searchKeyword = itemCategory || quickViewItem.title.replace(/[^\w\s]/gi, '').split(/\s+/).slice(0, 2).join(' ');
+            if (searchKeyword && searchKeyword.length > 2) {
+              const searchRes = await apiClient.get('/api/v1/products/search', {
+                params: {
+                  q: searchKeyword,
+                  limit: 8
+                }
+              });
+              const searchItems = searchRes.data?.products || (Array.isArray(searchRes.data) ? searchRes.data : []);
+              searchItems.forEach(addCandidate);
+            }
+          } catch (e) {
+            // Continue
+          }
+        }
+
+        // 5. Discover items fallback - strictly domain-filtered!
+        if (discoverItems && discoverItems.length > 0 && candidateMap.size < 6) {
+          discoverItems.forEach(addCandidate);
+        }
+
+        const finalList = Array.from(candidateMap.values()).slice(0, 6);
 
         if (isSubscribed) {
-          setQuickViewRecommendations([]);
+          setQuickViewRecommendations(finalList);
           setLoadingQuickViewRecommendations(false);
         }
       } catch (err) {
         console.warn('Failed to load preview recommendations:', err);
         if (isSubscribed) {
-          if (discoverItems && discoverItems.length > 0) {
-            setQuickViewRecommendations(discoverItems.filter(p => (p.id || p._id) !== (quickViewItem?.id || quickViewItem?._id)).slice(0, 6));
-          }
+          const safeFallback = (discoverItems || [])
+            .filter(p => (p.id || p._id) !== (quickViewItem?.id || quickViewItem?._id) && isCategoryCompatible(quickViewItem, p))
+            .slice(0, 6);
+          setQuickViewRecommendations(safeFallback);
           setLoadingQuickViewRecommendations(false);
         }
       }
@@ -4640,6 +4671,27 @@ export default function PayAI() {
                         disabled={isSending}
                       />
                       <button
+                        type="button"
+                        onClick={() => openScanner((parsed) => {
+                          if (parsed.type === 'product' && parsed.title) {
+                            handleSendMessage(`Tell me about this product: "${parsed.title}" (ID: ${parsed.id || ''})`);
+                          } else if (parsed.type === 'store') {
+                            handleSendMessage(`Show me details and products from the store "${parsed.title}"`);
+                          } else if (parsed.type === 'order') {
+                            handleSendMessage(`Track my order ${parsed.id}`);
+                          } else if (parsed.type === 'receipt') {
+                            handleSendMessage(`Show receipt details for ${parsed.id}`);
+                          } else {
+                            handleSendMessage(`Inspect this scanned QR code: ${parsed.targetUrl || parsed.rawText}`);
+                          }
+                        })}
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-white/5 hover:bg-white/15 text-[var(--text-muted)] hover:text-blue-500 flex items-center justify-center shrink-0 transition-all cursor-pointer border border-white/10"
+                        title="Scan QR Code into PayAI"
+                        aria-label="Scan QR Code"
+                      >
+                        <QrCode size={16} />
+                      </button>
+                      <button
                         type="submit"
                         disabled={isSending || (!inputText.trim() && !attachedChatProduct)}
                         className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#006cff] hover:bg-[#0057d9] text-white flex items-center justify-center shrink-0 disabled:opacity-25 transition-all cursor-pointer shadow-[0_6px_16px_rgba(0,108,255,0.3)]"
@@ -5246,7 +5298,7 @@ export default function PayAI() {
                       </div>
 
                       <p className="text-xs font-medium text-[var(--text-muted)] mb-4 leading-relaxed line-clamp-3">
-                        {quickViewItem.description || 'Native W-Commerce merchant product with verified escrow protection, quality inspection, and direct express checkout.'}
+                        {decodeHtml(quickViewItem.description) || 'Native W-Commerce merchant product with verified escrow protection, quality inspection, and direct express checkout.'}
                       </p>
                     </div>
 

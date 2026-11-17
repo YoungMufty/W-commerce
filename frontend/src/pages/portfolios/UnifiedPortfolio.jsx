@@ -1,9 +1,10 @@
 import { PLACEHOLDER_IMAGE } from '@/constants/placeholders';
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Star, MapPin, Package, Users, ShoppingBag, Calendar, MessageSquare, LayoutGrid, Heart, ShoppingCart, Layout, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, Star, MapPin, Package, Users, ShoppingBag, Calendar, MessageSquare, LayoutGrid, Heart, ShoppingCart, Layout, AlertTriangle, QrCode } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiClient } from '../../utils/apiClient';
 import { useCartStore } from '../../store/cartStore';
+import { useQRStore } from '../../store/qrStore';
 import { useNavigate } from 'react-router-dom';
 import LayoutEngine from '../../components/storefront/LayoutEngine';
 import { toast } from 'react-hot-toast';
@@ -159,6 +160,7 @@ export const generateBannerStyle = (styleId = 'Premium1', customColors = {}) => 
 }
 
 const DynamicBannerEngine = ({ store, brandConfig, isFollowing, followersCount, onFollow, tier = 'free', styleId = 'Premium1', onOpenBanRatingModal, isOwner = false, onManageStore }) => {
+  const { openShare } = useQRStore();
   const style = generateBannerStyle(styleId, { primary: store?.primaryColor, secondary: store?.secondaryColor, tier: tier?.toLowerCase() });
   
   const isDefault = styleId === 'Default';
@@ -308,6 +310,26 @@ const DynamicBannerEngine = ({ store, brandConfig, isFollowing, followersCount, 
             {isFollowing ? '✓ Following' : 'Follow Store'}
           </motion.button>
         )}
+        <motion.button 
+          whileHover={{ scale:1.05 }} 
+          whileTap={{ scale:0.95 }} 
+          onClick={() => openShare({
+            type: 'store',
+            id: store?.id,
+            slug: store?.slug || store?.portfolioSlug || store?.id,
+            title: store?.storeName || 'Verified Storefront',
+            subtitle: store?.description || 'Verified GlobalX Merchant Partner',
+            imageUrl: store?.logoUrl || store?.bannerUrl,
+            metadata: {
+              tier,
+              followers: followersCount
+            }
+          })}
+          className="px-4 py-2 rounded-full text-xs font-bold shadow-xl backdrop-blur-sm transition-all duration-300 bg-black/60 hover:bg-black/90 text-white border border-white/20 flex items-center justify-center gap-1.5 cursor-pointer"
+          title="Share Storefront QR Code"
+        >
+          <QrCode size={13} /> QR Pass
+        </motion.button>
       </div>
     </div>
   );

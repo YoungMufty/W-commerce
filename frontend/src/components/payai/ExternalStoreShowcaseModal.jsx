@@ -39,6 +39,7 @@ export default function ExternalStoreShowcaseModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [isFollowing, setIsFollowing] = useState(false);
+  const { openShare } = useQRStore();
 
   // Keyboard shortcut: close on Escape
   const handleKeyDown = useCallback((e) => {
@@ -210,6 +211,28 @@ export default function ExternalStoreShowcaseModal({
 
   const storeTier = String(currentStore.sellerTier || 'PRO').toUpperCase();
 
+  const formattedPlatform = useMemo(() => {
+    const raw = (currentStore.platform || 'Shopify').toLowerCase().replace(/_/g, ' ').trim();
+    if (raw === 'custom store') return 'Brand Storefront';
+    if (raw === 'woocommerce') return 'WooCommerce Verified';
+    if (raw === 'shopify') return 'Shopify Verified';
+    if (raw === 'amazon') return 'Amazon Storefront';
+    if (raw === 'aliexpress') return 'AliExpress Storefront';
+    if (raw === 'ebay') return 'eBay Storefront';
+    if (raw === 'asos') return 'ASOS Storefront';
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  }, [currentStore.platform]);
+
+  const formattedTier = useMemo(() => {
+    const tier = String(currentStore.sellerTier || 'PRO').toUpperCase();
+    if (tier === 'BRONZE') return { label: 'Bronze Portfolio', style: 'bg-amber-500/15 text-amber-600 dark:text-amber-300 border-amber-500/30' };
+    if (tier === 'SILVER') return { label: 'Silver Portfolio', style: 'bg-slate-400/15 text-slate-700 dark:text-slate-300 border-slate-400/30' };
+    if (tier === 'GOLD') return { label: 'Gold Portfolio', style: 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-300 border-yellow-500/30' };
+    if (tier === 'PLATINUM') return { label: 'Platinum Portfolio', style: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 border-cyan-500/30' };
+    if (tier === 'DIAMOND') return { label: 'Diamond Portfolio', style: 'bg-violet-500/15 text-violet-600 dark:text-violet-300 border-violet-500/30' };
+    return { label: `${tier} Portfolio`, style: 'bg-blue-500/15 text-blue-600 dark:text-blue-300 border-blue-500/30' };
+  }, [currentStore.sellerTier]);
+
   const portfolioUrl = useMemo(() => {
     const slug = currentStore.portfolioSlug || (currentStore.storeName ? currentStore.storeName.toLowerCase().replace(/[^a-z0-9]+/g, '-') : currentStore.storeId || currentStore.id);
     const linkParam = currentStore.linkId ? `?linkId=${encodeURIComponent(currentStore.linkId)}` : '';
@@ -249,104 +272,137 @@ export default function ExternalStoreShowcaseModal({
       {/* ══════════════════════════════════════════════════════════════════
           1. LUXURY PORTFOLIO HERO & BRAND IDENTITY BANNER
          ══════════════════════════════════════════════════════════════════ */}
-          <div className="relative h-60 sm:h-72 w-full overflow-hidden shrink-0 select-none bg-slate-950">
-            {/* Background Cover Image with Editorial Dark Scrim */}
-            <img
-              src={currentStore.bannerUrl || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1400&q=80'}
-              alt={currentStore.storeName}
-              className="w-full h-full object-cover opacity-60 scale-100 hover:scale-105 transition-transform duration-1000 ease-out"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-white via-white/40 to-transparent dark:from-[#121214] dark:via-[#121214]/65 dark:to-black/40" />
+      <div className="relative w-full shrink-0 select-none bg-slate-950">
+        {/* Banner Cover Image with Editorial Dark Scrim */}
+        <div className="relative h-44 sm:h-56 md:h-64 w-full overflow-hidden">
+          <img
+            src={currentStore.bannerUrl || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1400&q=80'}
+            alt={currentStore.storeName}
+            className="w-full h-full object-cover opacity-60 scale-100 hover:scale-105 transition-transform duration-1000 ease-out"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
 
-            {/* Ambient Brand Light Ring Glow */}
-            <div className="absolute top-0 right-1/4 w-72 h-72 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute bottom-0 left-1/3 w-80 h-32 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+          {/* Ambient Brand Light Glows */}
+          <div className="absolute top-0 right-1/4 w-72 h-72 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-1/3 w-80 h-32 bg-purple-500/15 rounded-full blur-3xl pointer-events-none" />
+        </div>
 
-            {/* Brand Identity Elements */}
-            <div className="absolute inset-x-4 sm:inset-x-8 bottom-4 flex flex-col sm:flex-row sm:items-end justify-between gap-4 z-10">
-              {/* Left: Avatar + Brand Info */}
-              <div className="flex items-end gap-3.5 sm:gap-5 min-w-0 flex-1">
-                {/* Store Avatar / Logo in Luxury Ring */}
-                <div className="w-18 h-18 sm:w-22 sm:h-22 rounded-2xl sm:rounded-3xl bg-white dark:bg-zinc-900 p-1 shadow-2xl shrink-0 overflow-hidden border-2 border-white/40 ring-4 ring-blue-500/20 backdrop-blur-md">
-                  <StoreLogoAvatar
-                    store={currentStore}
-                    className="rounded-xl sm:rounded-2xl"
-                    textClassName="text-base sm:text-xl font-black"
-                    iconSize={36}
-                  />
-                </div>
-
-                <div className="min-w-0 flex-1 pb-1">
-                  {/* Badges Row */}
-                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mb-1.5">
-                    <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/20 text-white dark:text-white backdrop-blur-md border border-white/30 shadow-xs">
-                      {currentStore.platform || 'Shopify'}
-                    </span>
-                    <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs">
-                      {storeTier} PORTFOLIO
-                    </span>
-                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 backdrop-blur-md px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-emerald-500/30 shadow-xs">
-                      <ShieldCheck size={11} className="text-emerald-400" />
-                      <span>Verified Partner</span>
-                    </span>
-                  </div>
-
-                  {/* Brand Name */}
-                  <h1 className="text-xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight truncate drop-shadow-md">
-                    {currentStore.storeName}
-                  </h1>
-
-                  {/* Verified Store Metrics */}
-                  <div className="flex items-center gap-2 sm:gap-3 text-xs text-slate-700 dark:text-white/80 mt-1 flex-wrap">
-                    <span className="text-blue-600 dark:text-blue-300 font-bold">
-                      {products.length} Curated Items
-                    </span>
-                    <span>•</span>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                      <CheckCircle2 size={12} className="text-emerald-500" />
-                      <span>Official Merchant Partner</span>
-                    </span>
-                  </div>
-                </div>
+        {/* Brand Profile Details Block (overlapping the banner) */}
+        <div className="relative px-4 sm:px-8 pb-5 pt-0 bg-white dark:bg-[#121214] border-b border-slate-200/80 dark:border-white/[0.06]">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            {/* Left: Store Avatar overlapping banner + Brand Details */}
+            <div className="flex items-start sm:items-end gap-3.5 sm:gap-5 min-w-0 flex-1 -mt-12 sm:-mt-14 z-10">
+              {/* Store Avatar / Logo in Luxury Ring */}
+              <div className="w-20 h-20 sm:w-26 sm:h-26 rounded-2xl sm:rounded-3xl bg-white dark:bg-zinc-900 p-1.5 shadow-2xl shrink-0 overflow-hidden border-2 border-white/80 dark:border-zinc-700 ring-4 ring-black/10 dark:ring-white/10 backdrop-blur-md">
+                <StoreLogoAvatar
+                  store={currentStore}
+                  className="rounded-xl sm:rounded-2xl w-full h-full"
+                  textClassName="text-xl sm:text-2xl font-black"
+                  iconSize={42}
+                />
               </div>
 
-              {/* Right: Quick Action Controls */}
-              <div className="flex items-center gap-2 shrink-0 self-start sm:self-end pb-1">
-                <button
-                  type="button"
-                  onClick={handleFollowToggle}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 ${
-                    isFollowing
-                      ? 'bg-rose-500/15 text-rose-500 border border-rose-500/30'
-                      : 'bg-white/80 dark:bg-white/10 hover:bg-white text-slate-700 dark:text-white border border-slate-200 dark:border-white/15'
-                  }`}
-                >
-                  <Heart size={13} className={isFollowing ? 'fill-rose-500 text-rose-500' : ''} />
-                  <span>{isFollowing ? 'Following' : 'Follow'}</span>
-                </button>
+              {/* Brand Text Content */}
+              <div className="min-w-0 flex-1 pt-2 sm:pt-0">
+                {/* Badges Row - Clean horizontal pills that wrap gracefully without collision */}
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mb-1.5">
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-white/10 shadow-xs flex items-center gap-1 whitespace-nowrap">
+                    <Globe size={11} className="text-blue-500 shrink-0" />
+                    <span>{formattedPlatform}</span>
+                  </span>
+                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border shadow-xs flex items-center gap-1 whitespace-nowrap ${formattedTier.style}`}>
+                    <Award size={11} className="shrink-0" />
+                    <span>{formattedTier.label}</span>
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-emerald-500/20 shadow-xs whitespace-nowrap">
+                    <ShieldCheck size={12} className="text-emerald-500 shrink-0" />
+                    <span>Verified Partner</span>
+                  </span>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={handleShare}
-                  aria-label="Share Store Portfolio"
-                  className="p-2 rounded-xl bg-white/80 dark:bg-white/10 hover:bg-white text-slate-700 dark:text-white border border-slate-200 dark:border-white/15 transition cursor-pointer shadow-sm active:scale-95"
-                  title="Share Brand Portfolio"
-                >
-                  <Share2 size={14} />
-                </button>
+                {/* Brand Name - Majestic, clean, NOT truncated prematurely */}
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight leading-tight break-words drop-shadow-xs">
+                  {decodeHtml(currentStore.storeName)}
+                </h1>
 
-                <a
-                  href={currentStore.externalUrl || currentStore.storeUrl || '#'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#006cff] hover:bg-blue-600 text-white flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer"
-                >
-                  <span>Official Website</span>
-                  <ExternalLink size={12} />
-                </a>
+                {/* Verified Store Metrics */}
+                <div className="flex items-center gap-2 text-xs mt-2 flex-wrap">
+                  <span className="font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 dark:bg-blue-500/15 px-2.5 py-0.5 rounded-md whitespace-nowrap">
+                    {products.length} Curated Items
+                  </span>
+                  <span className="font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 dark:bg-emerald-500/15 px-2.5 py-0.5 rounded-md flex items-center gap-1 whitespace-nowrap">
+                    <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />
+                    <span>Official Merchant Partner</span>
+                  </span>
+                  {currentStore.originCountry && (
+                    <span className="font-medium text-slate-600 dark:text-zinc-400 bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-md flex items-center gap-1 whitespace-nowrap">
+                      <MapPin size={11} className="shrink-0" />
+                      <span>{currentStore.originCountry}</span>
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
+
+            {/* Right: Quick Action Controls */}
+            <div className="flex items-center gap-2 shrink-0 self-stretch sm:self-auto justify-end pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-white/[0.04]">
+              <button
+                type="button"
+                onClick={handleFollowToggle}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 ${
+                  isFollowing
+                    ? 'bg-rose-500/15 text-rose-500 border border-rose-500/30'
+                    : 'bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/15 text-slate-700 dark:text-white border border-slate-200 dark:border-white/10'
+                }`}
+              >
+                <Heart size={13} className={isFollowing ? 'fill-rose-500 text-rose-500' : ''} />
+                <span>{isFollowing ? 'Following' : 'Follow'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleShare}
+                aria-label="Share Store Portfolio"
+                className="p-2.5 rounded-xl bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/15 text-slate-700 dark:text-white border border-slate-200 dark:border-white/10 transition cursor-pointer shadow-sm active:scale-95"
+                title="Share Brand Portfolio"
+              >
+                <Share2 size={14} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => openShare({
+                  type: 'store',
+                  id: currentStore.storeId || currentStore.id,
+                  slug: currentStore.portfolioSlug || currentStore.storeName?.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+                  title: currentStore.storeName || 'Verified Storefront',
+                  subtitle: currentStore.description || 'Verified GlobalX Merchant Partner',
+                  imageUrl: currentStore.logoUrl || currentStore.bannerUrl,
+                  metadata: {
+                    tier: currentStore.sellerTier,
+                    originCountry: currentStore.originCountry
+                  }
+                })}
+                aria-label="Store QR Code"
+                className="p-2.5 rounded-xl bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/15 text-slate-700 dark:text-white border border-slate-200 dark:border-white/10 transition cursor-pointer shadow-sm active:scale-95"
+                title="Share Storefront QR Code"
+              >
+                <QrCode size={14} />
+              </button>
+
+              <a
+                href={currentStore.externalUrl || currentStore.storeUrl || '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-[#006cff] hover:bg-blue-600 text-white flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer"
+              >
+                <span>Official Website</span>
+                <ExternalLink size={12} />
+              </a>
+            </div>
           </div>
+        </div>
+      </div>
 
           {/* ══════════════════════════════════════════════════════════════════
               2. PROFESSIONAL PORTFOLIO TRUST & ASSURANCE STRIP
@@ -385,19 +441,20 @@ export default function ExternalStoreShowcaseModal({
           {/* ══════════════════════════════════════════════════════════════════
               3. PORTFOLIO TABS NAVIGATION
              ══════════════════════════════════════════════════════════════════ */}
-          <div className="px-4 sm:px-8 pt-3 pb-2 border-b border-slate-200/70 dark:border-white/[0.06] flex items-center justify-between gap-3 shrink-0">
+          <div className="px-4 sm:px-8 pt-3 pb-2 border-b border-slate-200/70 dark:border-white/[0.06] flex items-center justify-between gap-3 shrink-0 overflow-x-auto no-scrollbar">
             <div className="flex items-center gap-1.5 sm:gap-2">
               <button
                 type="button"
                 onClick={() => setActiveTab('products')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                   activeTab === 'products'
                     ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm'
                     : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                <ShoppingBag size={13} />
-                <span>Curated Collection</span>
+                <ShoppingBag size={13} className="shrink-0" />
+                <span>Curated</span>
+                <span className="hidden sm:inline">Collection</span>
                 <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/10 dark:bg-white/20">
                   {products.length}
                 </span>
@@ -406,33 +463,35 @@ export default function ExternalStoreShowcaseModal({
               <button
                 type="button"
                 onClick={() => setActiveTab('story')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                   activeTab === 'story'
                     ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm'
                     : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                <Store size={13} />
-                <span>Brand Story & Profile</span>
+                <Store size={13} className="shrink-0" />
+                <span>Brand Story</span>
+                <span className="hidden sm:inline">& Profile</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveTab('shipping')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                   activeTab === 'shipping'
                     ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm'
                     : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                <Truck size={13} />
-                <span>Landed Cost & Logistics</span>
+                <Truck size={13} className="shrink-0" />
+                <span>Landed Cost</span>
+                <span className="hidden sm:inline">& Logistics</span>
               </button>
             </div>
 
             {/* Quick Bio Snippet */}
             <p className="text-[11px] text-slate-500 dark:text-zinc-400 hidden md:block max-w-xs truncate text-right">
-              {currentStore.description || 'Verified cross-border merchant with global logistics.'}
+              {decodeHtml(currentStore.description) || 'Verified cross-border merchant with global logistics.'}
             </p>
           </div>
 

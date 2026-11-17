@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShieldCheck, CheckCircle2, Copy, Check, Plane, Truck, ExternalLink,
-  Lock, ArrowRight, MessageSquare, Clock, Sparkles, Box, CheckCircle
+  Lock, ArrowRight, MessageSquare, Clock, Sparkles, Box, CheckCircle, QrCode
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useQRStore } from '../../store/qrStore';
 
 /**
  * Robust Receipt Parser: Extracts verified receipt metadata from
@@ -130,6 +131,7 @@ export default function OfficialReceiptCard({
   onAskAI
 }) {
   const [copiedField, setCopiedField] = useState(null);
+  const { openShare } = useQRStore();
   const data = parseReceiptData(message);
 
   if (!data) return null;
@@ -364,6 +366,29 @@ export default function OfficialReceiptCard({
             >
               <MessageSquare size={14} className="text-[#006cff] shrink-0" />
               <span>Ask PayAI Status</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => openShare({
+                type: 'receipt',
+                id: data.orderNumber,
+                title: `Official Receipt #${data.orderNumber}`,
+                subtitle: `Amount: $${formattedUSD} (₦${formattedNGN}) • ${data.paymentMethod}`,
+                amount: data.amountUSD || data.sellerPayoutNGN,
+                currency: data.amountUSD ? 'USD' : 'NGN',
+                status: 'PAID_ESCROW',
+                metadata: {
+                  orderNumber: data.orderNumber,
+                  trackingNumber: data.trackingNumber,
+                  carrier: data.carrier
+                }
+              })}
+              className="py-3 px-3.5 rounded-xl neu-button text-[var(--text-main)] hover:text-teal-500 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shrink-0"
+              title="Share Receipt QR Code"
+            >
+              <QrCode size={14} className="text-teal-500 shrink-0" />
+              <span>QR Pass</span>
             </button>
           </div>
 

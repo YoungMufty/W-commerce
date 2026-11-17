@@ -1,5 +1,5 @@
 import { PLACEHOLDER_IMAGE } from '@/constants/placeholders';
-import { isVideoUrl, getImageUrl } from '@/utils/imageHelpers';
+import { isVideoUrl, getImageUrl, decodeHtml, isCategoryCompatible } from '@/utils/imageHelpers';
 import React, { useState, useEffect } from 'react';
 import { X, ShoppingCart, ShieldCheck, Package, Sparkles, Eye, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -37,55 +37,102 @@ const ProductPreviewModal = ({ isOpen, onClose, product, handleAddToCart }) => {
 
     const fetchRecommendations = async () => {
       try {
+        const prodId = currentProduct.id;
+        const prodCategory = currentProduct.category || '';
+        const candidateMap = new Map();
+
+        const addCandidate = (p) => {
+          if (!p) return;
+          const pid = p.id || p._id;
+          if (!pid || pid === prodId || candidateMap.has(pid)) return;
+          if (isCategoryCompatible(currentProduct, p)) {
+            candidateMap.set(pid, p);
+          }
+        };
+
         // 1. Try bundle endpoint
         try {
-          const bundleRes = await apiClient.get(`/api/v1/products/${currentProduct.id}/bundle`);
+          const bundleRes = await apiClient.get(`/api/v1/products/${prodId}/bundle`);
           if (bundleRes.data?.success && bundleRes.data?.bundle) {
             const b = bundleRes.data.bundle;
-            const combined = [
-              ...(b.recommended || []),
+            const bundleItems = [
+              ...(b.similarProducts || []),
               ...(b.similar || []),
+              ...(b.otherSellers || []),
+              ...(b.complementaryItems || []),
+              ...(b.recommended || []),
               ...(b.peopleAlsoBought || []),
               ...(b.alternatives || [])
-            ].filter(p => p.id !== currentProduct.id);
-
-            const unique = [];
-            const seen = new Set();
-            for (const p of combined) {
-              if (p.id && !seen.has(p.id)) {
-                seen.add(p.id);
-                unique.push(p);
-              }
-            }
-
-            if (unique.length > 0 && isSubscribed) {
-              setRecommendations(unique.slice(0, 4));
-              setLoadingRecommendations(false);
-              return;
-            }
+            ];
+            bundleItems.forEach(addCandidate);
           }
         } catch (e) {
-          // Continue to recommendations endpoint
+          // Continue to category recommendations
         }
 
-        // 2. Fetch general recommendations
-        const recRes = await apiClient.get('/api/v1/products/recommendations?limit=6');
-        if (recRes.data?.success && Array.isArray(recRes.data?.recommendations) && recRes.data.recommendations.length > 0) {
-          const filtered = recRes.data.recommendations.filter(p => p.id !== currentProduct.id);
-          if (isSubscribed) {
-            setRecommendations(filtered.slice(0, 4));
-            setLoadingRecommendations(false);
-            return;
+        // 2. Fetch category-targeted recommendations
+        if (candidateMap.size < 4) {
+          try {
+            const recRes = await apiClient.get('/api/v1/products/recommendations', {
+              params: {
+                productId: prodId,
+                category: prodCategory,
+                limit: 8
+              }
+            });
+            if (recRes.data?.success && Array.isArray(recRes.data?.recommendations)) {
+              recRes.data.recommendations.forEach(addCandidate);
+            }
+          } catch (e) {
+            // Continue
           }
         }
 
+        // 3. Fallback direct category products query if still needed
+        if (candidateMap.size < 4 && prodCategory) {
+          try {
+            const catRes = await apiClient.get('/api/v1/products', {
+              params: {
+                category: prodCategory,
+                limit: 8
+              }
+            });
+            const list = catRes.data?.products || (Array.isArray(catRes.data) ? catRes.data : []);
+            list.forEach(addCandidate);
+          } catch (e) {
+            // Continue
+          }
+        }
+
+        // 4. Keyword search fallback if still sparse
+        if (candidateMap.size < 2 && currentProduct.title) {
+          try {
+            const searchKeyword = prodCategory || currentProduct.title.replace(/[^\w\s]/gi, '').split(/\s+/).slice(0, 2).join(' ');
+            if (searchKeyword && searchKeyword.length > 2) {
+              const searchRes = await apiClient.get('/api/v1/products/search', {
+                params: {
+                  q: searchKeyword,
+                  limit: 6
+                }
+              });
+              const searchItems = searchRes.data?.products || (Array.isArray(searchRes.data) ? searchRes.data : []);
+              searchItems.forEach(addCandidate);
+            }
+          } catch (e) {
+            // Continue
+          }
+        }
+
+        const finalList = Array.from(candidateMap.values()).slice(0, 4);
+
         if (isSubscribed) {
-          setRecommendations([]);
+          setRecommendations(finalList);
           setLoadingRecommendations(false);
         }
       } catch (err) {
         console.warn('Error fetching preview modal recommendations:', err);
         if (isSubscribed) {
+          setRecommendations([]);
           setLoadingRecommendations(false);
         }
       }
@@ -183,7 +230,7 @@ const ProductPreviewModal = ({ isOpen, onClose, product, handleAddToCart }) => {
              )}
           </div>
           
-          <h2 className="text-xl md:text-2xl font-extrabold mb-2 leading-tight">{currentProduct.title}</h2>
+          <h2 className="text-xl md:text-2xl font-extrabold mb-2 leading-tight">{decodeHtml(currentProduct.title)}</h2>
           
           <div className="flex flex-wrap items-center gap-3 mb-4 text-xs text-[var(--text-muted,#9ca3af)]">
             <div className="flex items-center gap-1 text-amber-400 font-bold">
@@ -233,7 +280,7 @@ const ProductPreviewModal = ({ isOpen, onClose, product, handleAddToCart }) => {
             </div>
           )}
 
-          <p className="text-xs text-[var(--text-muted,#9ca3af)] line-clamp-2 mb-5 leading-relaxed">{currentProduct.description}</p>
+          <p className="text-xs text-[var(--text-muted,#9ca3af)] line-clamp-2 mb-5 leading-relaxed">{decodeHtml(currentProduct.description)}</p>
 
           {/* Primary Action Buttons */}
           <div className="flex flex-col sm:flex-row items-center gap-3 mb-6">
@@ -294,11 +341,11 @@ const ProductPreviewModal = ({ isOpen, onClose, product, handleAddToCart }) => {
                       className="group p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-[#006cff]/40 transition-all cursor-pointer flex items-center gap-2.5"
                     >
                       <div className="w-12 h-12 rounded-lg bg-black/40 overflow-hidden shrink-0 flex items-center justify-center p-1">
-                        <img src={recImg} alt={rec.title} className="max-h-full max-w-full object-contain" />
+                        <img src={recImg} alt={decodeHtml(rec.title)} className="max-h-full max-w-full object-contain" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h5 className="text-[11px] font-bold truncate group-hover:text-[#006cff] transition-colors">
-                          {rec.title}
+                          {decodeHtml(rec.title)}
                         </h5>
                         <p className="text-xs font-black text-white">
                           ₦{recPrice.toLocaleString()}

@@ -4,10 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Search, Filter, Download, ArrowDownLeft, ArrowUpRight,
   ChevronDown, Calendar, RefreshCw, TrendingUp, TrendingDown, CheckCircle,
-  Clock, XCircle, ShoppingBag, Gift, RotateCcw, Wallet, EyeOff, Copy
+  Clock, XCircle, ShoppingBag, Gift, RotateCcw, Wallet, EyeOff, Copy, QrCode
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useWalletStore } from '../../store/walletStore';
+import { useQRStore } from '../../store/qrStore';
 
 const CATEGORY_ICONS = {
   topup: ArrowDownLeft,
@@ -28,6 +29,7 @@ const STATUS_CONFIG = {
 export default function WalletTransactions() {
   const navigate = useNavigate();
   const { transactions, fetchTransactions, currency } = useWalletStore();
+  const { openShare } = useQRStore();
   const [activeTab, setActiveTab] = useState('all');
   const [search, setSearch] = useState('');
   const [showDateFilter, setShowDateFilter] = useState(false);
@@ -248,10 +250,39 @@ export default function WalletTransactions() {
                 </div>
               </div>
               
-              <button className="w-full mt-6 py-3 rounded-xl bg-[var(--accent-primary)] text-white font-bold hover:opacity-90 flex items-center justify-center gap-2">
-                <Copy size={16} />
-                Download Receipt
-              </button>
+              <div className="flex gap-2 w-full mt-6">
+                <button
+                  onClick={() => openShare({
+                    type: 'transaction',
+                    id: selectedTx.id,
+                    title: `Transaction Proof #${selectedTx.id.substring(0, 10).toUpperCase()}`,
+                    subtitle: `${selectedTx.desc || 'Wallet Transfer'} • ${selectedTx.date}`,
+                    amount: selectedTx.amount,
+                    currency: currency || 'NGN',
+                    status: selectedTx.status,
+                    metadata: {
+                      type: selectedTx.type,
+                      reference: selectedTx.id,
+                      date: selectedTx.date
+                    }
+                  })}
+                  className="flex-1 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md text-xs"
+                >
+                  <QrCode size={16} />
+                  <span>Transaction QR</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`Transaction Reference: ${selectedTx.id}\nAmount: ${selectedTx.amount}\nStatus: ${selectedTx.status}`);
+                    toast.success('Transaction reference copied!');
+                  }}
+                  className="py-3 px-4 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-main)] font-bold hover:bg-[var(--bg-card)] flex items-center justify-center gap-1.5 transition-all text-xs cursor-pointer"
+                  title="Copy Reference"
+                >
+                  <Copy size={16} />
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

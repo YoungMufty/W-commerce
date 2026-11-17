@@ -568,9 +568,9 @@ class RecommendationService {
             ]
         });
 
-        // If category filter returned empty, try broad fallback without category
+        // If category filter was specifically requested but yielded no products, do not return random cross-domain items
         if (products.length === 0 && targetCategory) {
-            return this.getFallbackRecommendations(limit, null);
+            return [];
         }
 
         return products.map((product) => ({
