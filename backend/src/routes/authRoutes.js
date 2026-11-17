@@ -82,7 +82,7 @@ const isGoogleStrategyReady = () => {
 
 // Google OAuth routes - uses Passport.js when configured
 router.get('/google', (req, res, next) => {
-    const frontendUrl = (process.env.FRONTEND_URL || 'https://w-commerce-1yqf-nine.vercel.app').replace(/\/+$/, '');
+    const frontendUrl = (process.env.FRONTEND_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://w-commerce-1yqf-nine.vercel.app')).replace(/\/+$/, '');
 
     // Bulletproof guard: check if Google OAuth credentials and strategy are ready
     if (!isGoogleStrategyReady()) {
@@ -99,15 +99,24 @@ router.get('/google', (req, res, next) => {
     try {
         const passport = require('passport');
 
-        // Store return URL in session if present
-        if (req.query.returnUrl && req.session) {
+        // Store state in base64 URL-safe parameter so it survives across serverless cold starts & multiple instances
+        const statePayload = {
+            role: req.query.role || 'BUYER',
+            returnUrl: req.query.returnUrl || '/'
+        };
+        const stateStr = Buffer.from(JSON.stringify(statePayload)).toString('base64url');
+
+        // Store return URL & role in session if session store is active
+        if (req.session) {
             req.session.returnUrl = req.query.returnUrl;
+            req.session.selectedRole = req.query.role;
         }
 
         // Trigger Google OAuth flow safely - intercept errors rather than letting next(err) crash with 500
         passport.authenticate('google', {
             scope: ['profile', 'email'],
-            prompt: 'select_account' // Always show account picker
+            prompt: 'select_account', // Always show account picker
+            state: stateStr
         })(req, res, (err) => {
             if (err) {
                 logger.error(`Google OAuth initiation error: ${err.message}`);
@@ -136,7 +145,7 @@ router.get('/google', (req, res, next) => {
 
 router.get('/google/callback',
     (req, res, next) => {
-        const frontendUrl = (process.env.FRONTEND_URL || 'https://w-commerce-1yqf-nine.vercel.app').replace(/\/+$/, '');
+        const frontendUrl = (process.env.FRONTEND_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://w-commerce-1yqf-nine.vercel.app')).replace(/\/+$/, '');
 
         // Bulletproof guard: check if Google strategy is configured before attempting callback
         if (!isGoogleStrategyReady()) {
@@ -176,13 +185,37 @@ router.get('/google/callback',
             return res.redirect(`${frontendUrl}/login?error=google_callback_failed`);
         }
     },
-    (req, res) => {
-        const frontendUrl = (process.env.FRONTEND_URL || 'https://w-commerce-1yqf-nine.vercel.app').replace(/\/+$/, '');
+    async (req, res) => {
+        const frontendUrl = (process.env.FRONTEND_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://w-commerce-1yqf-nine.vercel.app')).replace(/\/+$/, '');
         try {
-            // User is now in req.user (from Passport)
-            const user = req.user;
+            let user = req.user;
             if (!user) {
                 return res.redirect(`${frontendUrl}/login?error=google_auth_failed`);
+            }
+
+            // Extract role & returnUrl from state payload (or session fallback)
+            let stateData = {};
+            if (req.query.state) {
+                try {
+                    stateData = JSON.parse(Buffer.from(req.query.state, 'base64url').toString('utf8'));
+                } catch (e) {
+                    logger.warn(`Could not parse Google OAuth state: ${e.message}`);
+                }
+            }
+            const requestedRole = stateData.role || req.session?.selectedRole || 'BUYER';
+            let returnPath = stateData.returnUrl || req.session?.returnUrl || '/';
+
+            // If user role was PENDING, assign requested role
+            if (user.role === 'PENDING' && requestedRole && requestedRole !== 'PENDING') {
+                try {
+                    const prisma = require('../utils/prismaClient');
+                    user = await prisma.user.update({
+                        where: { id: user.id },
+                        data: { role: requestedRole }
+                    });
+                } catch (roleErr) {
+                    logger.warn(`Failed to update pending user role: ${roleErr.message}`);
+                }
             }
 
             // Generate JWT token
@@ -192,17 +225,23 @@ router.get('/google/callback',
                 { expiresIn: '30d' }
             );
 
-            // Record session
-            const prisma = require('../utils/prismaClient');
-            prisma.userSession.create({
-                data: {
-                    userId: user.id,
-                    token: token,
-                    userAgent: req.headers['user-agent'] || null,
-                    ipAddress: req.ip || req.connection?.remoteAddress || null,
-                    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            // Record session safely
+            try {
+                const prisma = require('../utils/prismaClient');
+                if (prisma.userSession) {
+                    prisma.userSession.create({
+                        data: {
+                            userId: user.id,
+                            token: token,
+                            userAgent: req.headers['user-agent'] || null,
+                            ipAddress: req.ip || req.connection?.remoteAddress || null,
+                            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                        }
+                    }).catch(err => logger.error(`Google OAuth session creation error: ${err.message}`));
                 }
-            }).catch(err => logger.error(`Google OAuth session creation error: ${err.message}`));
+            } catch (sessErr) {
+                logger.warn(`Session recording failed: ${sessErr.message}`);
+            }
 
             // Set httpOnly cookie
             res.cookie('token', token, {
@@ -212,19 +251,13 @@ router.get('/google/callback',
                 maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
             });
 
-            // Determine redirect URL
-            let returnPath = req.session?.returnUrl || '/';
-            if (req.session?.returnUrl) {
-                delete req.session.returnUrl;
-            }
-
             // Ensure returnPath starts with / and doesn't contain a domain or protocol to avoid open redirect vulnerabilities
             if (!returnPath.startsWith('/') || returnPath.startsWith('//')) {
                 returnPath = '/';
             }
             const returnUrl = frontendUrl + returnPath;
 
-            logger.info(`User logged in via Google OAuth: ${user.email}`);
+            logger.info(`User logged in via Google OAuth: ${user.email} (role: ${user.role})`);
             return res.redirect(returnUrl);
 
         } catch (err) {

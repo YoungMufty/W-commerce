@@ -99,80 +99,91 @@ process.on('uncaughtException', (error) => {
 
 const app = require('./src/app.cjs');
 
-const server = http.createServer(app);
-globalStartup.server = server;
-logger.info('Initializing socket connections...');
-const { io } = initializeSockets(server, globalStartup);
-logger.info('Socket connections initialized');
-const PORT = process.env.PORT || 3000;
-
-// ============================================================================
-// START SERVER WITH PROPER ERROR HANDLING
-// ============================================================================
-
-async function startServerWithErrorHandling() {
-    if (globalStartup.serverStarted) {
-        logger.warn('Server start attempted twice in same process - skipping duplicate start');
-        return;
-    }
-    globalStartup.serverStarted = true;
-
-    logger.info('Awaiting Redis connection...');
-    await redisReadyPromise;
-    logger.info('Redis connection ready');
-    const redisStatus = redisManager.getStatus();
-    const isProduction = process.env.NODE_ENV === 'production';
-    if (isProduction && (!redisStatus.connected || redisStatus.useFallback)) {
-        logger.warn('⚠️ Redis-backed session store is unavailable in production. Running with in-memory fallback.');
+// In Vercel Serverless, do NOT start HTTP listeners, bind ports, or call server.listen()
+// Vercel wraps the exported Express app as an ephemeral serverless request handler
+if (!process.env.VERCEL) {
+    const server = http.createServer(app);
+    globalStartup.server = server;
+    try {
+        logger.info('Initializing socket connections...');
+        const { io } = initializeSockets(server, globalStartup);
+        logger.info('Socket connections initialized');
+    } catch (e) {
+        logger.warn(`Socket initialization skipped: ${e.message}`);
     }
 
-    const basePort = parseInt(process.env.PORT, 10) || 5000;
+    const PORT = process.env.PORT || 3000;
 
-    // ── Verify database connectivity before accepting traffic ──────────────────
-    const { verifyDatabaseConnection } = require('./src/utils/prismaClient');
-    await verifyDatabaseConnection(3, 2000);
+    // ============================================================================
+    // START SERVER WITH PROPER ERROR HANDLING (STANDALONE ONLY)
+    // ============================================================================
 
-    const maxAttempts = 2;
-    let attempts = 0;
-    let currentPort = basePort;
+    async function startServerWithErrorHandling() {
+        if (globalStartup.serverStarted) {
+            logger.warn('Server start attempted twice in same process - skipping duplicate start');
+            return;
+        }
+        globalStartup.serverStarted = true;
 
-    const tryStart = () => {
-        attempts += 1;
-
-        if (global.serverInstance) {
-            global.serverInstance.removeAllListeners('error');
+        logger.info('Awaiting Redis connection...');
+        await redisReadyPromise;
+        logger.info('Redis connection ready');
+        const redisStatus = redisManager.getStatus();
+        const isProduction = process.env.NODE_ENV === 'production';
+        if (isProduction && (!redisStatus.connected || redisStatus.useFallback)) {
+            logger.warn('⚠️ Redis-backed session store is unavailable in production. Running with in-memory fallback.');
         }
 
-        global.serverInstance = server.listen(currentPort, '0.0.0.0', () => {
-            const addr = global.serverInstance.address();
-            logger.info('✅ Server is running on port ' + addr.port);
-        });
+        const basePort = parseInt(process.env.PORT, 10) || 5000;
 
-        global.serverInstance.on('error', (error) => {
-            if (error.code === 'EADDRINUSE') {
-                logger.warn('Port ' + currentPort + ' is in use.');
-                if (attempts < maxAttempts) {
-                    currentPort += 1;
-                    logger.info('Trying port ' + currentPort + '...');
-                    setTimeout(tryStart, 1000);
+        // ── Verify database connectivity before accepting traffic ──────────────────
+        const { verifyDatabaseConnection } = require('./src/utils/prismaClient');
+        await verifyDatabaseConnection(3, 2000);
+
+        const maxAttempts = 2;
+        let attempts = 0;
+        let currentPort = basePort;
+
+        const tryStart = () => {
+            attempts += 1;
+
+            if (global.serverInstance) {
+                global.serverInstance.removeAllListeners('error');
+            }
+
+            global.serverInstance = server.listen(currentPort, '0.0.0.0', () => {
+                const addr = global.serverInstance.address();
+                logger.info('✅ Server is running on port ' + addr.port);
+            });
+
+            global.serverInstance.on('error', (error) => {
+                if (error.code === 'EADDRINUSE') {
+                    logger.warn('Port ' + currentPort + ' is in use.');
+                    if (attempts < maxAttempts) {
+                        currentPort += 1;
+                        logger.info('Trying port ' + currentPort + '...');
+                        setTimeout(tryStart, 1000);
+                    } else {
+                        logger.error('Max attempts reached. Could not find an available port.');
+                        process.exit(1);
+                    }
                 } else {
-                    logger.error('Max attempts reached. Could not find an available port.');
+                    logger.error('Server error: ' + error.message);
                     process.exit(1);
                 }
-            } else {
-                logger.error('Server error: ' + error.message);
-                process.exit(1);
-            }
-        });
-    };
+            });
+        };
 
-    tryStart();
+        tryStart();
+    }
+
+    startServerWithErrorHandling().catch((error) => {
+        logger.error('Failed to start server: ' + error.message);
+        logger.error(error.stack);
+        process.exit(1);
+    });
+} else {
+    logger.info('⚡ Running in Vercel Serverless environment — server.listen and Socket.io bypassed.');
 }
 
-startServerWithErrorHandling().catch((error) => {
-    logger.error('Failed to start server: ' + error.message);
-    logger.error(error.stack);
-    process.exit(1);
-});
-// restarted
 module.exports = app;

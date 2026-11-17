@@ -578,7 +578,12 @@ const initializeCron = async () => {
     }
 };
 
-initializeCron();
+// Only initialize background cron schedulers in standalone node processes, never inside Vercel serverless requests
+if (!process.env.VERCEL) {
+    initializeCron();
+} else {
+    logger.info('⚡ Cron jobs disabled in Vercel Serverless environment');
+}
 
 // Phase 7 — Register domain event handlers (notifications, logging, side-effects)
 const { registerEventHandlers } = require('./services/domainEventHandlers');

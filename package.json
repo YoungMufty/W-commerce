@@ -18,6 +18,7 @@
     "prisma:generate": "prisma generate --schema=database/prisma/postgres/schema.prisma",
     "prisma:deploy": "prisma migrate deploy --schema=database/prisma/postgres/schema.prisma",
     "db:migrate:deploy": "prisma migrate deploy --schema=database/prisma/postgres/schema.prisma",
+    "db:test-supabase": "node scripts/test-supabase-connection.cjs",
     "db:migrate-data": "node scripts/migrate-sqlite-to-postgres.cjs",
     "env:validate": "node scripts/validate-production-env.cjs"
   },

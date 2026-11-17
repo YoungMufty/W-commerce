@@ -29,7 +29,7 @@ function build() {
   const ds = /datasource\s+db\s*\{[^}]*\}/.exec(raw);
   if (!ds) throw new Error('datasource block not found in schema.prisma');
   if (!/provider\s*=\s*"sqlite"/.test(ds[0])) throw new Error('Expected dev schema to use sqlite provider');
-  const pgDatasource = 'datasource db {\n  provider = "postgresql"\n  url      = env("DATABASE_URL")\n}';
+  const pgDatasource = 'datasource db {\n  provider  = "postgresql"\n  url       = env("DATABASE_URL")\n  directUrl = env("DIRECT_URL")\n}';
   return HEADER + raw.replace(ds[0], pgDatasource);
 }
 

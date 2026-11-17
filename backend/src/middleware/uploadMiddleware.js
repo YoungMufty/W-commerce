@@ -29,17 +29,25 @@ if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
 
 // If cloud providers are configured, use memory storage so we can stream directly from buffer.
 const cloudConfigured = Boolean((process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY) || (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY));
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 
 const fs = require('fs');
 
-// Ensure local storage directory exists
-const localStorageDir = path.join(__dirname, '../../storage/uploads');
-if (!fs.existsSync(localStorageDir)) {
-    fs.mkdirSync(localStorageDir, { recursive: true });
+// Ensure local storage directory exists safely (use os.tmpdir() in serverless to prevent EROFS)
+const localStorageDir = isServerless
+    ? path.join(require('os').tmpdir(), 'w-commerce-uploads')
+    : path.join(__dirname, '../../storage/uploads');
+
+try {
+    if (!fs.existsSync(localStorageDir)) {
+        fs.mkdirSync(localStorageDir, { recursive: true });
+    }
+} catch (e) {
+    // In serverless / read-only filesystem, ignore directory creation failures
 }
 
-// Configure Storage
-const storage = cloudConfigured
+// Configure Storage: in serverless, ALWAYS use memoryStorage if cloud is configured or disk is read-only
+const storage = (cloudConfigured || isServerless)
     ? multer.memoryStorage()
     : multer.diskStorage({
         destination: (req, file, cb) => {

@@ -130,6 +130,12 @@ check('DATABASE_URL', 'PostgreSQL Database Connection', (v) => {
   return 'Must be a valid PostgreSQL connection string starting with postgresql://';
 });
 
+check('DIRECT_URL', 'PostgreSQL Direct Connection (Optional / Supabase)', (v) => {
+  if (!v) return 'WARN: DIRECT_URL not set. If using Supabase transaction pooler (port 6543) for DATABASE_URL, set DIRECT_URL to port 5432 for migrations.';
+  if (v.startsWith('postgresql://') || v.startsWith('postgres://')) return true;
+  return 'WARN: DIRECT_URL should be a PostgreSQL connection string.';
+});
+
 check('REDIS_URL', 'Redis Session & Pub/Sub Store', (v) => {
   if (!v) return 'WARN: REDIS_URL not set. System will fall back to in-memory store (state lost on restarts/scaling).';
   if (isPlaceholder(v)) return 'WARN: Contains placeholder Redis host.';
