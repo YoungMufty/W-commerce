@@ -44,6 +44,8 @@ import DesignStudio from '../../components/seller/Dashboard/DesignStudio';
 import SellerAIStudio from '../../components/seller/Dashboard/SellerAIStudio';
 import ExternalSiteStudio from '../../components/seller/Dashboard/ExternalSiteStudio';
 import SellerNegotiationControlRoom from '../../components/seller/Dashboard/SellerNegotiationControlRoom';
+import AppealDisputeStudio from '../../components/seller/Dashboard/AppealDisputeStudio';
+import AppealReviewStudio from '../../components/seller/Dashboard/AppealReviewStudio';
 
 // ── Error Boundary: prevents blank white screen on any render crash ───────────
 class SellerDashboardErrorBoundary extends React.Component {
@@ -791,46 +793,106 @@ const SellerDashboard = ({ initialTab }) => {
             )}
 
             {activeTab === 'disputes' && (
-              <div className="bg-white/40 backdrop-blur-md border border-slate-200/50 p-8 rounded-3xl min-h-[600px] flex flex-col relative overflow-hidden shadow-sm">
-              <div className="space-y-6">
-                <h1 className="text-3xl font-extrabold text-black mb-6">Disputes Resolution Center</h1>
-                {disputes?.length > 0 ? (
-                  <div className="space-y-4">
-                    {disputes.map(dispute => (
-                      <div key={dispute.id} className="bg-white border border-[var(--border-color)] p-6 rounded-xl border-l-4 border-l-gray-300">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <h4 className="font-bold text-black">{dispute.reason || 'Dispute Created'}</h4>
-                            <p className="text-xs text-[var(--text-muted)] mt-1">Order #{dispute.orderId?.slice(-8).toUpperCase()}</p>
-                            <p className="text-sm text-[var(--text-muted)] mt-2">{dispute.description}</p>
-                          </div>
-                          <div className="flex flex-col items-end gap-2">
-                            <span className={`text-xs uppercase px-2.5 py-1 rounded-full font-bold border ${
-                              dispute.status === 'OPEN' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 
-                              'bg-[var(--bg-tertiary)] text-gray-500 border-gray-700'
-                            }`}>
-                              Status: {dispute.status}
-                            </span>
-                            <button 
-                              onClick={() => { setRespondingDispute(dispute); setIsDisputeModalOpen(true); }}
-                              className="text-sm bg-gray-100 px-3 py-1 rounded text-black hover:bg-gray-700 transition-colors"
-                            >
-                              Respond
-                            </button>
+              <div className="bg-white/40 backdrop-blur-md border border-slate-200/50 p-6 sm:p-8 rounded-3xl min-h-[600px] flex flex-col relative overflow-hidden shadow-sm">
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between gap-4 flex-wrap pb-4 border-b border-[var(--border-subtle)]">
+                    <div>
+                      <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] tracking-tight">Disputes Resolution Center</h1>
+                      <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1">Review active disputes raised by buyers or system flags.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('appeal-dispute')}
+                      className="px-4 py-2.5 rounded-xl bg-[#008cff] hover:bg-[#0070cc] text-white font-bold text-xs flex items-center gap-2 transition-all shadow-md shadow-blue-500/20 cursor-pointer"
+                    >
+                      <Sparkles size={14} />
+                      <span>Submit Penalty Appeal</span>
+                    </button>
+                  </div>
+                  {disputes?.length > 0 ? (
+                    <div className="space-y-4">
+                      {disputes.map(dispute => (
+                        <div key={dispute.id} className="bg-white border border-[var(--border-color)] p-6 rounded-xl border-l-4 border-l-[#008cff]">
+                          <div className="flex justify-between items-center flex-wrap gap-4">
+                            <div>
+                              <h4 className="font-bold text-[var(--text-main)]">{dispute.reason || 'Dispute Created'}</h4>
+                              <p className="text-xs text-[var(--text-muted)] mt-1 font-mono">Order #{dispute.orderId?.slice(-8).toUpperCase()}</p>
+                              <p className="text-sm text-[var(--text-muted)] mt-2">{dispute.description}</p>
+                            </div>
+                            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                              <span className={`text-xs uppercase px-2.5 py-1 rounded-full font-bold border ${
+                                dispute.status === 'OPEN' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 
+                                'bg-[var(--bg-tertiary)] text-[var(--text-muted)] border-[var(--border-color)]'
+                              }`}>
+                                Status: {dispute.status}
+                              </span>
+                              <button 
+                                type="button"
+                                onClick={() => { setRespondingDispute(dispute); setIsDisputeModalOpen(true); }}
+                                className="text-xs bg-gray-100 px-3.5 py-2 rounded-xl text-black hover:bg-gray-200 transition-colors font-bold cursor-pointer"
+                              >
+                                Respond
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="bg-white border border-[var(--border-color)] rounded-xl p-12 text-center">
-                    <ShieldCheck size={40} className="mx-auto text-gray-600 mb-4" />
-                    <p className="text-[var(--text-muted)] text-lg">Great job! You have zero active disputes.</p>
-
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-white border border-[var(--border-color)] rounded-xl p-12 text-center">
+                      <ShieldCheck size={44} className="mx-auto text-emerald-500 mb-4" />
+                      <p className="text-[var(--text-main)] text-lg font-bold">Great job! You have zero active disputes.</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1 mb-4">If an automated penalty was applied to your store due to courier delays, you can submit an appeal.</p>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('appeal-dispute')}
+                        className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-[#008cff] hover:text-white text-[var(--text-main)] text-xs font-bold transition-colors border border-[var(--border-color)] cursor-pointer inline-flex items-center gap-1.5"
+                      >
+                        <Sparkles size={13} />
+                        <span>Submit Appeal to Mediation</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-</div>
+            )}
+
+            {activeTab === 'appeal-dispute' && (
+              <div className="neu-panel p-6 sm:p-10 rounded-3xl min-h-[600px] flex flex-col relative overflow-hidden">
+                <div className="mb-6 flex items-center justify-between gap-4 flex-wrap border-b border-[var(--border-subtle)] pb-4">
+                  <div>
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] tracking-tight">Penalty & Dispute Appeal Studio</h1>
+                    <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1">Submit an official appeal for courier delays, disputed orders, or compliance penalties.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('disputes')}
+                    className="neu-button px-4 py-2 text-xs font-bold text-[var(--text-main)] flex items-center gap-1.5 cursor-pointer rounded-xl hover:text-[#008cff] transition"
+                  >
+                    <span>← View All Disputes</span>
+                  </button>
+                </div>
+                <AppealDisputeStudio onSuccess={() => setActiveTab('disputes')} />
+              </div>
+            )}
+
+            {activeTab === 'appeal-review' && (
+              <div className="neu-panel p-6 sm:p-10 rounded-3xl min-h-[600px] flex flex-col relative overflow-hidden">
+                <div className="mb-6 flex items-center justify-between gap-4 flex-wrap border-b border-[var(--border-subtle)] pb-4">
+                  <div>
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] tracking-tight">Review Appeal Studio</h1>
+                    <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1">Submit an appeal against unfair, abusive, or fraudulent customer reviews.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('reviews')}
+                    className="neu-button px-4 py-2 text-xs font-bold text-[var(--text-main)] flex items-center gap-1.5 cursor-pointer rounded-xl hover:text-[#008cff] transition"
+                  >
+                    <span>← Back to Reviews</span>
+                  </button>
+                </div>
+                <AppealReviewStudio onSuccess={() => setActiveTab('reviews')} />
+              </div>
             )}
 
             {activeTab === 'buyers' && (
@@ -906,35 +968,59 @@ const SellerDashboard = ({ initialTab }) => {
             )}
 
             {activeTab === 'reviews' && (
-              <div className="bg-white/40 backdrop-blur-md border border-slate-200/50 p-8 rounded-3xl min-h-[600px] flex flex-col relative overflow-hidden shadow-sm">
-              <div className="space-y-6">
-                <h1 className="text-3xl font-extrabold text-black mb-6">Customer Feedback</h1>
-                {reviews?.length > 0 ? (
-                  <div className="space-y-4">
-                    {reviews.map(review => (
-                      <div key={review.id} className="bg-white border border-[var(--border-color)] p-6 rounded-xl">
-                        <div className="flex items-center gap-4 mb-2">
-                          <div className="flex text-yellow-500 gap-1">
-                            {[...Array(5)].map((_, i) => (
-                              <Star key={i} size={16} fill={i < review.rating ? "currentColor" : "none"} className={i < review.rating ? "" : "text-gray-600"} />
-                            ))}
-                          </div>
-                          <span className="font-bold text-black">{review.title || 'Review'}</span>
-                        </div>
-                        <p className="text-sm text-[var(--text-muted)] mt-2">{review.comment}</p>
-                        <p className="text-xs text-gray-600 mt-3">- {review.user?.fullName || review.user?.name || 'Anonymous'}</p>
-                      </div>
-                    ))}
+              <div className="bg-white/40 backdrop-blur-md border border-slate-200/50 p-6 sm:p-8 rounded-3xl min-h-[600px] flex flex-col relative overflow-hidden shadow-sm">
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between gap-4 flex-wrap pb-4 border-b border-[var(--border-subtle)]">
+                    <div>
+                      <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--text-main)] tracking-tight">Customer Feedback</h1>
+                      <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1">Monitor buyer reviews and appeal unjustified or defamatory ratings.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('appeal-review')}
+                      className="px-4 py-2.5 rounded-xl border border-[var(--border-color)] hover:border-[#008cff] text-[var(--text-main)] hover:text-[#008cff] text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Sparkles size={14} />
+                      <span>Appeal Unfair Review</span>
+                    </button>
                   </div>
-                ) : (
-                  <div className="bg-white border border-[var(--border-color)] rounded-xl p-12 text-center">
-                    <Star size={40} className="mx-auto text-gray-600 mb-4" />
-                    <p className="text-[var(--text-muted)]">No reviews yet. Keep delivering great service!</p>
 
-                  </div>
-                )}
+                  {reviews?.length > 0 ? (
+                    <div className="space-y-4">
+                      {reviews.map(review => (
+                        <div key={review.id} className="bg-white border border-[var(--border-color)] p-6 rounded-xl flex items-start justify-between gap-4 flex-wrap">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-4 mb-2">
+                              <div className="flex text-yellow-500 gap-1">
+                                {[...Array(5)].map((_, i) => (
+                                  <Star key={i} size={16} fill={i < review.rating ? "currentColor" : "none"} className={i < review.rating ? "" : "text-gray-600"} />
+                                ))}
+                              </div>
+                              <span className="font-bold text-black">{review.title || 'Review'}</span>
+                            </div>
+                            <p className="text-sm text-[var(--text-muted)] mt-2">{review.comment}</p>
+                            <p className="text-xs text-gray-600 mt-3">- {review.user?.fullName || review.user?.name || 'Anonymous'}</p>
+                          </div>
+                          {(review.rating <= 3) && (
+                            <button
+                              type="button"
+                              onClick={() => setActiveTab('appeal-review')}
+                              className="text-xs px-3 py-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 font-semibold transition-colors cursor-pointer"
+                            >
+                              Appeal Review
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-white border border-[var(--border-color)] rounded-xl p-12 text-center">
+                      <Star size={40} className="mx-auto text-gray-600 mb-4" />
+                      <p className="text-[var(--text-muted)]">No reviews yet. Keep delivering great service!</p>
+                    </div>
+                  )}
+                </div>
               </div>
-</div>
             )}
 
             {activeTab === 'settings' && (

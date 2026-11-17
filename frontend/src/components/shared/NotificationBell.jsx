@@ -342,7 +342,7 @@ const NotificationBell = () => {
                               <Icon size={18} />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h4 className={`text-sm font-bold truncate ${!notif.isRead ? 'text-black' : 'text-gray-700'}`}>{notif.title}</h4>
+                              <h4 className={`text-sm font-bold truncate ${!notif.isRead ? 'text-black dark:text-white' : 'text-gray-700 dark:text-gray-300'}`}>{notif.title}</h4>
                               {(() => {
                                 const bodyText = notif.body || notif.message || '';
                                 const audioMatch = bodyText.match(/\[Audio:\s*(https?:\/\/[^\]]+)\]/);

@@ -5,13 +5,53 @@ import { useNavigate } from 'react-router-dom';
 import {
   X, Camera, Image as ImageIcon, Sparkles, RefreshCw, Zap,
   CheckCircle2, ArrowRight, ExternalLink, ShoppingBag, Store,
-  Package, Receipt, Wallet, AlertCircle, Copy, Check
+  Package, Receipt, Wallet, AlertCircle, Copy, Check, UploadCloud, Loader2
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useQRStore } from '../../store/qrStore';
 import { QR_TYPES, parseQRData } from '../../utils/qrPayloadHelper';
 
 const REGION_ID = "wcom-html5-qr-reader";
+
+// Helper: load file as an HTMLImageElement
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      resolve({ img, url });
+    };
+    img.onerror = (e) => {
+      URL.revokeObjectURL(url);
+      reject(e);
+    };
+    img.src = url;
+  });
+}
+
+// Helper: downscale high-res photos to standard bounding box (e.g. 1000px)
+function downscaleImageBlob(img, maxDim = 1000) {
+  return new Promise((resolve) => {
+    let { width, height } = img;
+    if (width <= maxDim && height <= maxDim) {
+      return resolve(null);
+    }
+    if (width > height) {
+      height = Math.round((height * maxDim) / width);
+      width = maxDim;
+    } else {
+      width = Math.round((width * maxDim) / height);
+      height = maxDim;
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return resolve(null);
+    ctx.drawImage(img, 0, 0, width, height);
+    canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.92);
+  });
+}
 
 export default function QRScanModal({ isFullPage = false }) {
   const { isScannerOpen, closeScanner, customScanCallback } = useQRStore();
@@ -26,7 +66,10 @@ export default function QRScanModal({ isFullPage = false }) {
   const [scannedResult, setScannedResult] = useState(null);
   const [manualInput, setManualInput] = useState('');
   const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [filePreviewUrl, setFilePreviewUrl] = useState(null);
+  const [fileError, setFileError] = useState(null);
   const [copiedRaw, setCopiedRaw] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const html5QrCodeRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -115,8 +158,8 @@ export default function QRScanModal({ isFullPage = false }) {
       setIsCameraActive(false);
       setCameraError(
         err.name === 'NotAllowedError'
-          ? 'Camera permission was denied. Please allow camera access in your browser settings or upload a QR image below.'
-          : 'Unable to start camera. Please check your camera permissions or upload an image.'
+          ? 'Camera permission was denied. Please allow camera access in your browser settings or upload a QR image.'
+          : 'Unable to start camera. Please check camera permissions or use image upload.'
       );
     }
   }, [facingMode, handleDecodedText]);
@@ -141,35 +184,118 @@ export default function QRScanModal({ isFullPage = false }) {
     setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
   };
 
-  // Scan from uploaded file
-  const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Core Multi-Tier File Decoding Logic
+  const processImageFile = async (file) => {
+    if (!file || !file.type.startsWith('image/')) {
+      toast.error('Please select a valid image file');
+      return;
+    }
 
     setIsProcessingFile(true);
-    setCameraError(null);
+    setFileError(null);
 
+    // Stop active camera so it doesn't conflict
+    await stopCamera();
+
+    let loadedObj = null;
     try {
-      let qrEngine = html5QrCodeRef.current;
-      if (!qrEngine) {
-        qrEngine = new Html5Qrcode(REGION_ID);
-        html5QrCodeRef.current = qrEngine;
+      loadedObj = await loadImageFromFile(file);
+      setFilePreviewUrl(loadedObj.url);
+
+      let decodedText = null;
+
+      // Tier 1: Hardware-Accelerated Native BarcodeDetector (Chrome/Android/Edge/Safari TP)
+      if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
+        try {
+          const barcodeDetector = new window.BarcodeDetector({ formats: ['qr_code'] });
+          const barcodes = await barcodeDetector.detect(loadedObj.img);
+          if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+            decodedText = barcodes[0].rawValue;
+            console.debug('[QR] Detected via BarcodeDetector:', decodedText);
+          }
+        } catch (e) {
+          console.debug('[QR] BarcodeDetector check failed:', e);
+        }
       }
 
-      if (qrEngine.isScanning) {
-        await qrEngine.stop();
-        setIsCameraActive(false);
+      // Tier 2: Html5Qrcode.scanFile direct
+      if (!decodedText) {
+        let qrEngine = html5QrCodeRef.current;
+        if (!qrEngine) {
+          qrEngine = new Html5Qrcode(REGION_ID);
+          html5QrCodeRef.current = qrEngine;
+        }
+
+        try {
+          decodedText = await qrEngine.scanFile(file, false);
+          console.debug('[QR] Detected via html5QrCode.scanFile:', decodedText);
+        } catch (scanErr) {
+          console.debug('[QR] html5QrCode.scanFile direct attempt:', scanErr);
+        }
       }
 
-      const decodedText = await qrEngine.scanFile(file, true);
-      handleDecodedText(decodedText);
-      toast.success('QR Code recognized from image!');
+      // Tier 3: Offscreen Canvas Downscaling (Handles high-res 48MP phone photos)
+      if (!decodedText && loadedObj?.img) {
+        try {
+          const downscaledBlob = await downscaleImageBlob(loadedObj.img, 1000);
+          if (downscaledBlob) {
+            const downscaledFile = new File([downscaledBlob], 'qr-downscaled.jpg', { type: 'image/jpeg' });
+            let qrEngine = html5QrCodeRef.current;
+            if (!qrEngine) {
+              qrEngine = new Html5Qrcode(REGION_ID);
+              html5QrCodeRef.current = qrEngine;
+            }
+            decodedText = await qrEngine.scanFile(downscaledFile, false);
+            console.debug('[QR] Detected via downscaled image:', decodedText);
+          }
+        } catch (downscaleErr) {
+          console.debug('[QR] Downscale scan attempt:', downscaleErr);
+        }
+      }
+
+      if (decodedText) {
+        handleDecodedText(decodedText);
+        toast.success('QR Code recognized successfully!');
+      } else {
+        setFileError('No QR code detected in this image. Please ensure the code is well-lit, fully visible, and not blurred.');
+      }
     } catch (err) {
-      console.warn('File QR scan failed:', err);
-      toast.error('Could not detect a valid QR code in this image. Try another photo or adjust zoom.');
+      console.warn('File processing error:', err);
+      setFileError('Could not process this image. Please try another photo.');
     } finally {
       setIsProcessingFile(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // Scan from uploaded file input
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processImageFile(file);
+    }
+  };
+
+  // Drag and drop handlers
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processImageFile(file);
     }
   };
 
@@ -232,10 +358,19 @@ export default function QRScanModal({ isFullPage = false }) {
     closeScanner();
   };
 
+  // Switch tab helper
+  const handleTabChange = async (tab) => {
+    setScannedResult(null);
+    setFileError(null);
+    setActiveTab(tab);
+    if (tab !== 'camera') {
+      await stopCamera();
+    }
+  };
+
   // Lifecycle when modal opens/closes or tab changes
   useEffect(() => {
     if ((isScannerOpen || isFullPage) && activeTab === 'camera' && !scannedResult) {
-      // Small timeout to allow DOM element #wcom-html5-qr-reader to mount
       const timer = setTimeout(() => {
         startCamera();
       }, 150);
@@ -249,8 +384,11 @@ export default function QRScanModal({ isFullPage = false }) {
   useEffect(() => {
     return () => {
       stopCamera();
+      if (filePreviewUrl) {
+        URL.revokeObjectURL(filePreviewUrl);
+      }
     };
-  }, [stopCamera]);
+  }, [stopCamera, filePreviewUrl]);
 
   if (!isScannerOpen && !isFullPage) return null;
 
@@ -271,7 +409,7 @@ export default function QRScanModal({ isFullPage = false }) {
     <div className="relative w-full max-w-lg bg-slate-950 border border-white/10 rounded-3xl shadow-2xl overflow-hidden z-10 text-white flex flex-col">
       {/* Header Bar */}
       <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between bg-slate-900/80 backdrop-blur-md">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
             <Camera size={18} />
           </div>
@@ -292,10 +430,11 @@ export default function QRScanModal({ isFullPage = false }) {
         )}
       </div>
 
-      {/* Tabs */}
+      {/* Navigation Tabs */}
       <div className="flex border-b border-white/10 bg-slate-900/40 p-1 text-xs font-bold">
         <button
-          onClick={() => { setActiveTab('camera'); setScannedResult(null); }}
+          type="button"
+          onClick={() => handleTabChange('camera')}
           className={`flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
             activeTab === 'camera' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
           }`}
@@ -305,7 +444,8 @@ export default function QRScanModal({ isFullPage = false }) {
         </button>
 
         <button
-          onClick={() => { setActiveTab('upload'); setScannedResult(null); }}
+          type="button"
+          onClick={() => handleTabChange('upload')}
           className={`flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
             activeTab === 'upload' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
           }`}
@@ -315,7 +455,8 @@ export default function QRScanModal({ isFullPage = false }) {
         </button>
 
         <button
-          onClick={() => { setActiveTab('manual'); setScannedResult(null); }}
+          type="button"
+          onClick={() => handleTabChange('manual')}
           className={`flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
             activeTab === 'manual' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
           }`}
@@ -325,7 +466,7 @@ export default function QRScanModal({ isFullPage = false }) {
       </div>
 
       {/* Main Viewport Body */}
-      <div className="relative min-h-[360px] bg-black flex flex-col items-center justify-center overflow-hidden">
+      <div className="relative min-h-[380px] bg-black flex flex-col items-center justify-center overflow-hidden">
         {/* Scanned Result Card Overlay */}
         <AnimatePresence>
           {scannedResult && (
@@ -403,91 +544,101 @@ export default function QRScanModal({ isFullPage = false }) {
           )}
         </AnimatePresence>
 
-        {/* 1. Camera View */}
-        {activeTab === 'camera' && (
-          <div className="relative w-full h-[380px] bg-black flex items-center justify-center overflow-hidden">
-            {/* The HTML5 QR Code Mount Element */}
-            <div
-              id={REGION_ID}
-              className="w-full h-full object-cover [&_video]:w-full [&_video]:h-full [&_video]:object-cover"
-            />
+        {/* 1. Camera View - ALWAYS KEPT IN DOM SO ELEMENT ID IS NEVER LOST */}
+        <div
+          className={`relative w-full h-[380px] bg-black flex items-center justify-center overflow-hidden ${
+            activeTab === 'camera' ? 'block' : 'hidden'
+          }`}
+        >
+          {/* The HTML5 QR Code Mount Element */}
+          <div
+            id={REGION_ID}
+            className="w-full h-full object-cover [&_video]:w-full [&_video]:h-full [&_video]:object-cover"
+          />
 
-            {/* Custom Neon Targeting Reticle & Scan Laser Animation */}
-            {isCameraActive && (
-              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                {/* 240px Reticle Box */}
-                <div className="w-64 h-64 relative rounded-3xl border-2 border-white/20 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]">
-                  {/* Glowing Corner Brackets */}
-                  <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-blue-500 rounded-tl-2xl shadow-[0_0_15px_#3b82f6]" />
-                  <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-blue-500 rounded-tr-2xl shadow-[0_0_15px_#3b82f6]" />
-                  <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-blue-500 rounded-bl-2xl shadow-[0_0_15px_#3b82f6]" />
-                  <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-blue-500 rounded-br-2xl shadow-[0_0_15px_#3b82f6]" />
+          {/* Custom Neon Targeting Reticle & Scan Laser Animation */}
+          {isCameraActive && activeTab === 'camera' && (
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+              <div className="w-64 h-64 relative rounded-3xl border-2 border-white/20 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]">
+                {/* Glowing Corner Brackets */}
+                <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-blue-500 rounded-tl-2xl shadow-[0_0_15px_#3b82f6]" />
+                <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-blue-500 rounded-tr-2xl shadow-[0_0_15px_#3b82f6]" />
+                <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-blue-500 rounded-bl-2xl shadow-[0_0_15px_#3b82f6]" />
+                <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-blue-500 rounded-br-2xl shadow-[0_0_15px_#3b82f6]" />
 
-                  {/* Animated Laser Scan Bar */}
-                  <div className="absolute inset-x-2 h-1 bg-gradient-to-r from-transparent via-blue-400 to-transparent shadow-[0_0_20px_#60a5fa] animate-[bounce_2s_infinite]" />
-                </div>
+                {/* Animated Laser Scan Bar */}
+                <div className="absolute inset-x-2 h-1 bg-gradient-to-r from-transparent via-blue-400 to-transparent shadow-[0_0_20px_#60a5fa] animate-[bounce_2s_infinite]" />
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Camera Controls Bar (Facing Switch & Torch) */}
-            {isCameraActive && (
-              <div className="absolute bottom-4 inset-x-4 flex items-center justify-between pointer-events-auto z-20">
+          {/* Camera Controls Bar (Facing Switch & Torch) */}
+          {isCameraActive && activeTab === 'camera' && (
+            <div className="absolute bottom-4 inset-x-4 flex items-center justify-between pointer-events-auto z-20">
+              <button
+                type="button"
+                onClick={toggleCameraFacing}
+                className="px-3 py-1.5 rounded-full bg-black/60 hover:bg-black/90 text-white/90 text-xs font-bold backdrop-blur-md border border-white/20 flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                title="Switch camera"
+              >
+                <RefreshCw size={14} />
+                <span>Switch Cam</span>
+              </button>
+
+              {hasTorch && (
                 <button
-                  onClick={toggleCameraFacing}
-                  className="px-3 py-1.5 rounded-full bg-black/60 hover:bg-black/90 text-white/90 text-xs font-bold backdrop-blur-md border border-white/20 flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
-                  title="Switch camera"
+                  type="button"
+                  onClick={toggleTorch}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold backdrop-blur-md border transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 ${
+                    torchOn
+                      ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-[0_0_15px_rgba(251,191,36,0.6)]'
+                      : 'bg-black/60 hover:bg-black/90 text-white/90 border-white/20'
+                  }`}
+                  title="Toggle flashlight"
                 >
-                  <RefreshCw size={14} />
-                  <span>Switch Cam</span>
+                  <Zap size={14} className={torchOn ? 'fill-current' : ''} />
+                  <span>{torchOn ? 'Flash On' : 'Flash'}</span>
                 </button>
+              )}
+            </div>
+          )}
 
-                {hasTorch && (
-                  <button
-                    onClick={toggleTorch}
-                    className={`px-3 py-1.5 rounded-full text-xs font-bold backdrop-blur-md border transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 ${
-                      torchOn
-                        ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-[0_0_15px_rgba(251,191,36,0.6)]'
-                        : 'bg-black/60 hover:bg-black/90 text-white/90 border-white/20'
-                    }`}
-                    title="Toggle flashlight"
-                  >
-                    <Zap size={14} className={torchOn ? 'fill-current' : ''} />
-                    <span>{torchOn ? 'Flash On' : 'Flash'}</span>
-                  </button>
-                )}
+          {/* Camera Error Prompt */}
+          {cameraError && activeTab === 'camera' && (
+            <div className="absolute inset-0 bg-slate-950 p-6 flex flex-col items-center justify-center text-center z-30">
+              <AlertCircle size={40} className="text-amber-400 mb-3" />
+              <h4 className="text-base font-bold text-white mb-2">Camera Access Required</h4>
+              <p className="text-xs text-slate-400 max-w-xs leading-relaxed mb-5">
+                {cameraError}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={startCamera}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white transition-all cursor-pointer"
+                >
+                  Try Again
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleTabChange('upload')}
+                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition-all cursor-pointer"
+                >
+                  Upload QR Photo
+                </button>
               </div>
-            )}
-
-            {/* Camera Error Prompt */}
-            {cameraError && (
-              <div className="absolute inset-0 bg-slate-950 p-6 flex flex-col items-center justify-center text-center z-30">
-                <AlertCircle size={40} className="text-amber-400 mb-3" />
-                <h4 className="text-base font-bold text-white mb-2">Camera Access Required</h4>
-                <p className="text-xs text-slate-400 max-w-xs leading-relaxed mb-5">
-                  {cameraError}
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={startCamera}
-                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white transition-all cursor-pointer"
-                  >
-                    Try Again
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('upload')}
-                    className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition-all cursor-pointer"
-                  >
-                    Upload QR Photo
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
 
         {/* 2. Upload Photo View */}
         {activeTab === 'upload' && (
-          <div className="p-8 flex flex-col items-center justify-center text-center w-full">
+          <div
+            className="p-6 sm:p-8 flex flex-col items-center justify-center text-center w-full min-h-[380px]"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
             <input
               type="file"
               ref={fileInputRef}
@@ -498,24 +649,75 @@ export default function QRScanModal({ isFullPage = false }) {
 
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="w-full max-w-sm border-2 border-dashed border-white/20 hover:border-blue-500 rounded-3xl p-8 flex flex-col items-center justify-center cursor-pointer transition-all hover:bg-blue-500/5 group"
+              className={`w-full max-w-sm border-2 border-dashed rounded-3xl p-6 sm:p-8 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 group relative overflow-hidden ${
+                isDragging
+                  ? 'border-blue-400 bg-blue-500/15 scale-[1.02]'
+                  : 'border-white/20 hover:border-blue-500 bg-white/[0.02] hover:bg-blue-500/5'
+              }`}
             >
-              <div className="w-16 h-16 rounded-2xl bg-white/5 group-hover:bg-blue-500/20 text-slate-400 group-hover:text-blue-400 flex items-center justify-center mb-4 transition-all">
-                <ImageIcon size={32} />
-              </div>
+              {/* Image Preview or Upload Icon */}
+              {filePreviewUrl ? (
+                <div className="relative w-36 h-36 rounded-2xl overflow-hidden mb-3 border border-white/20 shadow-lg">
+                  <img
+                    src={filePreviewUrl}
+                    alt="Uploaded QR Preview"
+                    className="w-full h-full object-cover"
+                  />
+                  {isProcessingFile && (
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center text-white p-2">
+                      <Loader2 size={24} className="animate-spin text-blue-400 mb-1" />
+                      <span className="text-[10px] font-bold">Decoding QR...</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="w-16 h-16 rounded-2xl bg-white/5 group-hover:bg-blue-500/20 text-slate-400 group-hover:text-blue-400 flex items-center justify-center mb-4 transition-all">
+                  {isProcessingFile ? (
+                    <Loader2 size={32} className="animate-spin text-blue-400" />
+                  ) : (
+                    <UploadCloud size={32} />
+                  )}
+                </div>
+              )}
+
               <h4 className="text-sm font-bold text-white mb-1">
-                {isProcessingFile ? 'Scanning Image...' : 'Select QR Code Image'}
+                {isProcessingFile
+                  ? 'Analyzing QR Code...'
+                  : filePreviewUrl
+                  ? 'Click or Drop to Replace Image'
+                  : 'Select or Drop QR Code Image'}
               </h4>
-              <p className="text-xs text-slate-400 max-w-xs">
-                Upload a screenshot, saved photo, or receipt with a QR code to decode instantly.
+
+              <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+                Upload a screenshot, saved photo, or receipt containing a QR code to decode instantly.
               </p>
+
+              <button
+                type="button"
+                className="mt-4 px-4 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 text-xs font-bold transition-all"
+              >
+                Choose Photo from Device
+              </button>
             </div>
+
+            {/* Error Message if image decode fails */}
+            {fileError && (
+              <div className="mt-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs max-w-sm flex items-start gap-2 text-left">
+                <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-semibold">{fileError}</p>
+                  <p className="text-[10px] text-amber-300/80 mt-0.5">
+                    Tip: Try cropping closer to the QR code, or use the camera tab directly.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {/* 3. Manual Entry View */}
         {activeTab === 'manual' && (
-          <form onSubmit={handleManualSubmit} className="p-8 flex flex-col items-center justify-center w-full max-w-sm">
+          <form onSubmit={handleManualSubmit} className="p-8 flex flex-col items-center justify-center w-full max-w-sm min-h-[380px]">
             <h4 className="text-sm font-bold text-white mb-1">Enter Code or Link</h4>
             <p className="text-xs text-slate-400 text-center mb-4">
               Paste an order ID, transaction reference, product URL, or store slug.
