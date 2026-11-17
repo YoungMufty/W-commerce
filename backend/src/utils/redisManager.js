@@ -8,6 +8,7 @@ const redis = require('redis');
 const logger = require('../utils/logger');
 
 const isProduction = process.env.NODE_ENV === 'production';
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 
 class RedisManager {
     constructor() {
@@ -19,8 +20,8 @@ class RedisManager {
         this.redisWarned = false;
         this.readyPromise = null;
         this.retryCount = 0;
-        this.maxRetries = parseInt(process.env.REDIS_CONNECT_RETRIES || '5', 10);
-        this.baseRetryDelayMs = parseInt(process.env.REDIS_RETRY_BASE_MS || '500', 10);
+        this.maxRetries = parseInt(process.env.REDIS_CONNECT_RETRIES || (isServerless ? '1' : '5'), 10);
+        this.baseRetryDelayMs = parseInt(process.env.REDIS_RETRY_BASE_MS || (isServerless ? '150' : '500'), 10);
         this.retryTimer = null;
         this.status = {
             connected: false,
