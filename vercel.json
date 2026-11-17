@@ -1,10 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "services": {
-    "app": {
-      "root": ".",
-      "runtime": "container"
-    },
     "backend": {
       "root": "backend",
       "framework": "express",
@@ -21,7 +17,7 @@
       "root": "frontend",
       "framework": "vite"
     },
-    "ultra3pro-portfolio": {
+    "portfolio": {
       "root": "ultra3pro-portfolio",
       "framework": "vite"
     }
