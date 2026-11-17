@@ -6,13 +6,13 @@
   "scripts": {
     "start": "node server.cjs",
     "dev": "nodemon server.cjs",
-    "build": "prisma generate --schema=../database/prisma/postgres/schema.prisma || prisma generate --schema=../database/prisma/schema.prisma",
-    "postinstall": "prisma generate --schema=../database/prisma/postgres/schema.prisma || prisma generate --schema=../database/prisma/schema.prisma",
-    "prisma:generate": "prisma generate --schema=../database/prisma/postgres/schema.prisma",
-    "prisma:deploy": "prisma migrate deploy --schema=../database/prisma/postgres/schema.prisma",
-    "db:generate": "prisma generate --schema=../database/prisma/schema.prisma",
-    "db:generate:prod": "prisma generate --schema=../database/prisma/postgres/schema.prisma",
-    "db:migrate:deploy": "prisma migrate deploy --schema=../database/prisma/postgres/schema.prisma"
+    "build": "prisma generate --schema=prisma/schema.prisma || prisma generate --schema=../database/prisma/postgres/schema.prisma || prisma generate --schema=../database/prisma/schema.prisma",
+    "postinstall": "prisma generate --schema=prisma/schema.prisma || prisma generate --schema=../database/prisma/postgres/schema.prisma || prisma generate --schema=../database/prisma/schema.prisma",
+    "prisma:generate": "prisma generate --schema=prisma/schema.prisma || prisma generate --schema=../database/prisma/postgres/schema.prisma",
+    "prisma:deploy": "prisma migrate deploy --schema=prisma/schema.prisma || prisma migrate deploy --schema=../database/prisma/postgres/schema.prisma",
+    "db:generate": "prisma generate --schema=prisma/schema.prisma || prisma generate --schema=../database/prisma/schema.prisma",
+    "db:generate:prod": "prisma generate --schema=prisma/schema.prisma || prisma generate --schema=../database/prisma/postgres/schema.prisma",
+    "db:migrate:deploy": "prisma migrate deploy --schema=prisma/schema.prisma || prisma migrate deploy --schema=../database/prisma/postgres/schema.prisma"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1127.0",
@@ -43,6 +43,7 @@
     "nodemailer": "^10.0.1",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
+    "prisma": "^5.20.0",
     "puppeteer": "^25.3.0",
     "redis": "^4.7.0",
     "socket.io": "^4.8.0",
@@ -57,7 +58,6 @@
   "devDependencies": {
     "@types/node": "^24.13.2",
     "nodemon": "^3.1.4",
-    "prisma": "^5.20.0",
     "typescript": "~5.6.2"
   }
 }

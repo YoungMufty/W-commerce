@@ -49,17 +49,32 @@ class RedisManager {
     }
 
     async _initializeInternal() {
-        const redisUrl = process.env.REDIS_URL;
+        const redisUrl = (process.env.REDIS_URL || '').trim();
         this.status.lastAttemptAt = new Date().toISOString();
         this.status.attempts += 1;
+
+        // In serverless (Vercel / Lambda), local/docker URLs (redis://redis, localhost, 127.0.0.1, or placeholders)
+        // are unreachable. Bypass immediately to prevent 69-second cold-start timeout and FUNCTION_INVOCATION_FAILED.
+        const isLocalOrPlaceholder = !redisUrl ||
+            redisUrl.includes('//redis:') ||
+            redisUrl.includes('//localhost') ||
+            redisUrl.includes('//127.0.0.1') ||
+            redisUrl.includes('REPLACE_');
+
+        if (isServerless && isLocalOrPlaceholder) {
+            if (!this.redisWarned) {
+                logger.info('⚡ Vercel Serverless: REDIS_URL is local or unconfigured. Using high-performance in-memory cache immediately.');
+                this.redisWarned = true;
+            }
+            return this._enableMemoryFallback('Serverless local Redis bypass');
+        }
 
         if (!redisUrl) {
             if (!this.redisWarned) {
                 logger.warn('⚠️ REDIS_URL not set. Using in-memory cache.');
                 this.redisWarned = true;
             }
-            this._enableMemoryFallback('REDIS_URL missing');
-            return;
+            return this._enableMemoryFallback('REDIS_URL missing');
         }
 
         try {
@@ -77,7 +92,10 @@ class RedisManager {
     }
 
     async _connectWithBackoff(redisUrl) {
-        while (this.retryCount < this.maxRetries) {
+        // In serverless, never loop or backoff — single fast attempt (max 1.5s) to avoid function timeout
+        const maxAttempts = isServerless ? 1 : this.maxRetries;
+
+        while (this.retryCount < maxAttempts) {
             try {
                 await this._createClient(redisUrl);
                 this.retryCount = 0;
@@ -89,21 +107,17 @@ class RedisManager {
             } catch (error) {
                 this.retryCount += 1;
                 this.status.lastError = error.message;
+                if (this.retryCount >= maxAttempts) {
+                    throw new Error(`Redis connection failed after ${this.retryCount} attempts: ${error.message}`);
+                }
                 const retryDelay = this.baseRetryDelayMs * Math.pow(2, this.retryCount - 1);
-                const cappedDelay = Math.min(retryDelay, 10000);
+                const cappedDelay = Math.min(retryDelay, 5000);
                 const nextDelay = cappedDelay + Math.floor(Math.random() * 100);
 
                 if (!this.redisErrorLogged) {
                     logger.error('Redis connection failed', { error: error.message, attempt: this.retryCount, nextRetryMs: nextDelay });
                     this.redisErrorLogged = true;
-                } else {
-                    logger.warn('Retrying Redis connection', { attempt: this.retryCount, nextRetryMs: nextDelay });
                 }
-
-                if (this.retryCount >= this.maxRetries) {
-                    throw new Error(`Redis connection failed after ${this.retryCount} attempts: ${error.message}`);
-                }
-
                 await new Promise(resolve => setTimeout(resolve, nextDelay));
             }
         }
@@ -119,12 +133,13 @@ class RedisManager {
             this.client = null;
         }
 
+        const socketTimeout = isServerless ? 1500 : 10000;
         this.client = redis.createClient({
             url: redisUrl,
             socket: {
-                connectTimeout: 10000,
+                connectTimeout: socketTimeout,
                 reconnectStrategy: (retries) => {
-                    if (retries >= 3) {
+                    if (isServerless || retries >= 3) {
                         return new Error("Redis connection retries exhausted");
                     }
                     return Math.min(retries * 100, 1000);

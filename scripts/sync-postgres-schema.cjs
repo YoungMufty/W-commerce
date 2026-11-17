@@ -16,6 +16,8 @@ const root = path.resolve(__dirname, '..');
 const src = path.join(root, 'database/prisma/schema.prisma');
 const outDir = path.join(root, 'database/prisma/postgres');
 const out = path.join(outDir, 'schema.prisma');
+const backendPrismaDir = path.join(root, 'backend/prisma');
+const backendOut = path.join(backendPrismaDir, 'schema.prisma');
 
 const HEADER = `// ============================================================================
 // GENERATED FILE - DO NOT EDIT.
@@ -45,4 +47,9 @@ if (process.argv.includes('--check')) {
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(out, next, 'utf8');
   console.log('wrote', path.relative(root, out));
+
+  // Also sync to backend/prisma/schema.prisma so Vercel includes it in the serverless bundle
+  fs.mkdirSync(backendPrismaDir, { recursive: true });
+  fs.writeFileSync(backendOut, next, 'utf8');
+  console.log('wrote', path.relative(root, backendOut));
 }
