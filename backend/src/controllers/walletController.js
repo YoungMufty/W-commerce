@@ -282,8 +282,7 @@ exports.refundHold = async (req, res) => {
 };
 
 const bcrypt = require('bcryptjs');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../utils/prismaClient');
 const emailService = require('../services/emailService');
 
 exports.setWithdrawPin = async (req, res) => {

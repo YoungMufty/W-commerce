@@ -130,7 +130,7 @@ export default function AIBannerGenerator() {
 
         {error && (
           <div className="flex items-center gap-2 bg-red-500/20 border border-red-500/30 rounded-xl p-3 mb-6 text-red-400 text-sm">
-            {error}
+            {typeof error === 'object' ? (error?.message || error?.code || JSON.stringify(error)) : String(error || '')}
           </div>
         )}
 

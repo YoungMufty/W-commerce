@@ -74,7 +74,7 @@ export const WInput = ({ label, error, className = '', ...props }) => {
         className={`w-full bg-[var(--bg-tertiary)] border ${error ? 'border-red-500' : 'border-[var(--border-color)]'} rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[var(--border-hover)] transition-colors`}
         {...props}
       />
-      {error && <span className="text-xs text-red-500 font-bold">{error}</span>}
+      {error && <span className="text-xs text-red-500 font-bold">{typeof error === 'object' ? (error?.message || error?.code || JSON.stringify(error)) : String(error || '')}</span>}
     </div>
   );
 };

@@ -1,4 +1,4 @@
-# W-COMMERCE — Pre-Deploy Checklist (PowerShell)
+﻿# W-COMMERCE — Pre-Deploy Checklist (PowerShell)
 # Run: .\scripts\pre-deploy.ps1
 
 $ErrorActionPreference = 'Stop'
@@ -36,7 +36,7 @@ Write-Host "    ✅ PostgreSQL database URL detected" -ForegroundColor Green
 
 # ── 4. Prisma migrations ─────────────────────────────────────────────────────
 Write-Host "[4/5] Running Prisma migrations..." -ForegroundColor Yellow
-npx prisma migrate deploy --schema=database/prisma/schema.prisma
+npx prisma migrate deploy --schema=database/prisma/postgres/schema.prisma
 Write-Host "    ✅ Migrations applied" -ForegroundColor Green
 
 # ── 5. Frontend build ────────────────────────────────────────────────────────

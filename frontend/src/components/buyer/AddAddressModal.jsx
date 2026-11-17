@@ -71,7 +71,7 @@ const AddAddressModal = ({ isOpen, onClose }) => {
           <form onSubmit={handleSubmit} className="p-6 space-y-6 animate-in fade-in duration-300">
             {error && (
               <div className="bg-gray-500/10 border border-gray-500/50 text-gray-700 p-4 rounded-xl text-sm">
-                {error}
+                {typeof error === 'object' ? (error?.message || error?.code || JSON.stringify(error)) : String(error || '')}
               </div>
             )}
 

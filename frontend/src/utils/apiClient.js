@@ -41,3 +41,21 @@ apiClient.interceptors.request.use(config => {
   
   return config;
 });
+
+apiClient.interceptors.response.use(
+  response => response,
+  error => {
+    if (error && error.response && error.response.data) {
+      const data = error.response.data;
+      if (typeof data === 'object' && data !== null) {
+        const extracted = data.message || data.error || data.code;
+        if (typeof extracted === 'string' && extracted.trim()) {
+          error.message = extracted;
+        }
+      } else if (typeof data === 'string' && data.trim()) {
+        error.message = data;
+      }
+    }
+    return Promise.reject(error);
+  }
+);

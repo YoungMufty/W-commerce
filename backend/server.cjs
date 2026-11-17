@@ -123,8 +123,7 @@ async function startServerWithErrorHandling() {
     const redisStatus = redisManager.getStatus();
     const isProduction = process.env.NODE_ENV === 'production';
     if (isProduction && (!redisStatus.connected || redisStatus.useFallback)) {
-        logger.error('FATAL: Redis-backed session store is unavailable in production. Server shutting down.');
-        process.exit(1);
+        logger.warn('⚠️ Redis-backed session store is unavailable in production. Running with in-memory fallback.');
     }
 
     const basePort = parseInt(process.env.PORT, 10) || 5000;

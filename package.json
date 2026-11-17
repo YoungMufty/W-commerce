@@ -7,12 +7,16 @@
   ],
   "scripts": {
     "install:all": "npm install",
+    "postinstall": "prisma generate --schema=database/prisma/postgres/schema.prisma || prisma generate --schema=database/prisma/schema.prisma",
     "dev:frontend": "npm run dev --workspace=frontend",
     "dev:backend": "npm run dev --workspace=backend",
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "build": "npm run db:generate:prod && npm run build:production",
     "build:production": "npm run build --workspace=frontend",
     "db:sync-postgres-schema": "node scripts/sync-postgres-schema.cjs",
     "db:generate:prod": "prisma generate --schema=database/prisma/postgres/schema.prisma",
+    "prisma:generate": "prisma generate --schema=database/prisma/postgres/schema.prisma",
+    "prisma:deploy": "prisma migrate deploy --schema=database/prisma/postgres/schema.prisma",
     "db:migrate:deploy": "prisma migrate deploy --schema=database/prisma/postgres/schema.prisma",
     "db:migrate-data": "node scripts/migrate-sqlite-to-postgres.cjs",
     "env:validate": "node scripts/validate-production-env.cjs"

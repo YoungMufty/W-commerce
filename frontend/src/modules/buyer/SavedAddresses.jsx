@@ -137,7 +137,7 @@ export default function SavedAddresses() {
             <AlertTriangle size={32} />
           </div>
           <h2 className="text-xl font-bold">Unable to load addresses</h2>
-          <p className="text-[var(--text-muted)]">{errorMsg}</p>
+          <p className="text-[var(--text-muted)]">{typeof errorMsg === 'object' ? (errorMsg?.message || errorMsg?.code || JSON.stringify(errorMsg)) : String(errorMsg || '')}</p>
           <WButton 
             variant="primary" 
             onClick={() => fetchAddresses(true)}

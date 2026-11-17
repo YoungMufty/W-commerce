@@ -138,7 +138,7 @@ const DeliveryQueue = () => {
                     className="bg-rose-500/10 border border-rose-500/30 text-rose-500 rounded-2xl p-4 text-sm font-bold shadow-lg shadow-rose-500/10 flex items-center gap-3"
                 >
                     <ShieldAlert size={20} />
-                    {acceptError}
+                    {typeof acceptError === 'object' ? (acceptError?.message || acceptError?.code || JSON.stringify(acceptError)) : String(acceptError || '')}
                 </motion.div>
             )}
 

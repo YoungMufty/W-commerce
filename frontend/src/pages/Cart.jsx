@@ -1189,7 +1189,7 @@ const Cart = () => {
                       <div>
                         <h4 className="font-bold text-red-400 mb-1">Transaction Declined</h4>
                         <p className="text-gray-300 text-sm mb-3">
-                          "{checkoutError}"
+                          "{typeof checkoutError === 'object' ? (checkoutError?.message || checkoutError?.code || JSON.stringify(checkoutError)) : String(checkoutError || '')}"
                         </p>
                         {selectedPayment !== 'wallet' ? (
                           <>

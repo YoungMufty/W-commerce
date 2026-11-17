@@ -38,7 +38,7 @@ const CourierProfile = () => {
                 <div className="relative z-10 flex w-full items-center space-x-4">
                 {profileError ? (
                     <div className="flex flex-col items-center justify-center w-full space-y-2 py-2">
-                        <p className="text-red-400 text-sm">{profileError}</p>
+                        <p className="text-red-400 text-sm">{typeof profileError === 'object' ? (profileError?.message || profileError?.code || JSON.stringify(profileError)) : String(profileError || '')}</p>
                         <button onClick={() => fetchProfile(true)} className="px-4 py-1 bg-red-500/20 text-red-400 rounded-full text-xs font-bold">Retry</button>
                     </div>
                 ) : profile ? (

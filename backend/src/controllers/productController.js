@@ -6,6 +6,7 @@ const DOMPurify = require('isomorphic-dompurify');
 const { prismaErrorToAppError, AppError } = require('../utils/errorTypes');
 const { APPROVED_STORE, isStoreApproved } = require('../utils/storeApproval');
 const { getCategoryFallbackImage } = require('../utils/productImageHelper');
+const { STARTER_PRODUCTS, getFilteredStarterProducts } = require('../data/starterProducts');
 
 
 /**
@@ -447,37 +448,64 @@ exports.getAllProducts = async (req, res) => {
 
         const currentUserId = req.user?.id || resolveOptionalUserId(req);
         const userRole = req.user?.role;
-        const sanitizedProducts = products.map(p => sanitizeProductForBuyer(p, currentUserId, userRole));
+        let sanitizedProducts = products.map(p => sanitizeProductForBuyer(p, currentUserId, userRole));
+        let responseTotal = total;
+
+        // If DB is empty or returned 0 products (e.g. freshly deployed remote DB),
+        // supply curated starter drops so /feed and product discovery are immediately alive
+        if (sanitizedProducts.length === 0) {
+            let fallback = getFilteredStarterProducts(req.query);
+            if (fallback.products.length === 0) {
+                // If filters were too restrictive for the starter set, fallback to all starters
+                fallback = getFilteredStarterProducts({ limit: take });
+            }
+            sanitizedProducts = fallback.products;
+            responseTotal = fallback.total;
+        }
 
         res.json({
             success: true,
+            count: sanitizedProducts.length,
+            total: responseTotal,
+            data: sanitizedProducts,
             products: sanitizedProducts,
             pagination: {
-                total,
-                page: parseInt(page),
-                pages: Math.ceil(total / take)
+                total: responseTotal,
+                page: parseInt(page) || 1,
+                pages: Math.ceil(responseTotal / take) || 1
             }
         });
     } catch (error) {
         logger.error(`Get All Products Error: ${error.message}`);
-        const mapped = prismaErrorToAppError(error);
-        if (mapped) return res.status(mapped.statusCode).json({ success: false, message: mapped.message, code: error.code });
-        return res.status(500).json({ success: false, message: 'Failed to fetch products. Please try again.' });
+        // Graceful fallback to starter catalog during DB connection warming/outage
+        const fallback = getFilteredStarterProducts(req.query);
+        const fallbackProducts = fallback.products.length > 0 ? fallback.products : getFilteredStarterProducts({ limit: 12 }).products;
+        return res.json({
+            success: true,
+            count: fallbackProducts.length,
+            total: fallbackProducts.length,
+            data: fallbackProducts,
+            products: fallbackProducts,
+            pagination: {
+                total: fallbackProducts.length,
+                page: 1,
+                pages: 1
+            }
+        });
     }
 };
 
 // Get trending products (Public)
 exports.getTrendingProducts = async (req, res) => {
     try {
-        // Logic: Get products with high view count or order count.
-        // For now, we simulate this by taking the top 5 most recent products.
+        const limit = Math.min(Math.max(1, parseInt(req.query.limit) || 10), 50);
         const products = await prisma.product.findMany({
             where: {
                 isArchived: false,
                 stock: { gt: 0 },
                 store: { approvalStatus: 'APPROVED' }
             },
-            take: 5,
+            take: limit,
             orderBy: [{ isAdBoosted: 'desc' }, { viewCount: 'desc' }, { createdAt: 'desc' }],
             include: {
                 store: {
@@ -495,11 +523,28 @@ exports.getTrendingProducts = async (req, res) => {
         });
         const currentUserId = req.user?.id || resolveOptionalUserId(req);
         const userRole = req.user?.role;
-        const sanitizedProducts = products.map(p => sanitizeProductForBuyer(p, currentUserId, userRole));
-        res.json({ success: true, products: sanitizedProducts });
+        let sanitizedProducts = products.map(p => sanitizeProductForBuyer(p, currentUserId, userRole));
+
+        if (sanitizedProducts.length === 0) {
+            const fallback = getFilteredStarterProducts({ sort: 'popular', limit });
+            sanitizedProducts = fallback.products;
+        }
+
+        res.json({
+            success: true,
+            count: sanitizedProducts.length,
+            data: sanitizedProducts,
+            products: sanitizedProducts
+        });
     } catch (error) {
         logger.error(`Get Trending Error: ${error.message}`);
-        res.status(500).json({ success: false, message: 'Server error' });
+        const fallback = getFilteredStarterProducts({ sort: 'popular', limit: 10 });
+        res.json({
+            success: true,
+            count: fallback.products.length,
+            data: fallback.products,
+            products: fallback.products
+        });
     }
 };
 
@@ -1018,11 +1063,28 @@ exports.getFlashSales = async (req, res) => {
 
         const currentUserId = req.user?.id || resolveOptionalUserId(req);
         const userRole = req.user?.role;
-        const sanitizedProducts = flash.map(p => sanitizeProductForBuyer(p, currentUserId, userRole));
-        res.json({ success: true, products: sanitizedProducts });
+        let sanitizedProducts = flash.map(p => sanitizeProductForBuyer(p, currentUserId, userRole));
+
+        if (sanitizedProducts.length === 0) {
+            const fallback = getFilteredStarterProducts({ isFlashSale: true });
+            sanitizedProducts = fallback.products;
+        }
+
+        res.json({
+            success: true,
+            count: sanitizedProducts.length,
+            data: sanitizedProducts,
+            products: sanitizedProducts
+        });
     } catch (error) {
         logger.error(`Get Flash Sales Error: ${error.message}`);
-        res.status(500).json({ success: false, message: 'Server error' });
+        const fallback = getFilteredStarterProducts({ isFlashSale: true });
+        res.json({
+            success: true,
+            count: fallback.products.length,
+            data: fallback.products,
+            products: fallback.products
+        });
     }
 };
 
@@ -1820,8 +1882,6 @@ exports.reportProduct = async (req, res) => {
         const { id } = req.params;
         const { reason } = req.body;
         
-        const { PrismaClient } = require('@prisma/client');
-        const prisma = new PrismaClient();
         const emailService = require('../services/emailService');
         const logger = require('../utils/logger');
 

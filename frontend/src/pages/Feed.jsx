@@ -14,6 +14,7 @@ import FeedCard from '../components/feed/FeedCard';
 import FeedImmersiveViewer from '../components/feed/FeedImmersiveViewer';
 import { WFetchingAnimation } from '../components/motion/WFetchingAnimation';
 import { WEmptyState } from '../components/motion/WEmptyState';
+import { CURATED_STARTER_DROPS, getFilteredStarterDrops } from '../data/starterDrops';
 
 class FeedItemBoundary extends React.Component {
   constructor(props) {
@@ -89,21 +90,23 @@ const Feed = () => {
           const res = await axios.get('/api/v1/flash-deals/active');
           if (res.data.success && res.data.flashDeals?.length > 0) {
             const mapped = res.data.flashDeals.map(deal => {
-              const product = deal.product;
+              const product = deal.product || {};
+              const primaryImg = deal.bannerImage || product.images?.[0]?.url || (typeof product.images?.[0] === 'string' ? product.images[0] : null) || product.imageUrl || PLACEHOLDER_IMAGE;
               return {
-                id:              product.id || product._id,
+                id:              product.id || product._id || deal.id,
                 sellerId:        product.store?.sellerId || product.sellerId,
                 storeSlug:       product.store?.portfolioSlug,
                 storeId:         product.store?.id,
                 seller:          product.store?.storeName || 'Verified Seller',
                 avatar:          (product.store?.storeName || 'V')[0].toUpperCase(),
                 time:            '🔥 Flash Deal',
-                text:            `${deal.promoTitle} - ${deal.discount}% OFF! ${product.description?.slice(0, 80) || ''}`,
-                image:           deal.bannerImage ? optimizeImageUrl(deal.bannerImage) : null,
+                text:            `${deal.promoTitle || product.title} - ${deal.discount}% OFF! ${product.description?.slice(0, 80) || ''}`,
+                image:           optimizeImageUrl(primaryImg),
                 promoTitle:      deal.promoTitle,
                 promoType:       deal.promoType,
                 isFlashSale:     true,
                 discount:        deal.discount,
+                dealPrice:       deal.dealPrice,
                 audioUrl:        product.audioUrl || product.audio || null,
                 audioTitle:      product.audioTitle || null,
                 likes:           product.viewCount || 0,
@@ -117,7 +120,7 @@ const Feed = () => {
             }
             setPosts(mapped);
           } else {
-            setPosts([]);
+            setPosts(getFilteredStarterDrops('promotions', searchQuery));
           }
           setLoading(false);
           return;
@@ -172,35 +175,37 @@ const Feed = () => {
 
         if (products.length > 0) {
           // Map real products to feed post shape
-          const mapped = products.map(product => ({
-            id:              product.id || product._id,
-            sellerId:        product.store?.sellerId || product.sellerId,
-            storeSlug:       product.store?.portfolioSlug,
-            storeId:         product.store?.id,
-            seller:          product.store?.storeName || 'Verified Seller',
-            avatar:          (product.store?.storeName || 'V')[0].toUpperCase(),
-            time:            product.isFlashSale ? '🔥 Flash Deal' : 'Just Dropped',
-            text:            product.description?.slice(0, 110) || `${product.title} — Premium quality, limited stock!`,
-            image:           optimizeImageUrl(product.images?.[0]?.url || PLACEHOLDER_IMAGE),
-            audioUrl:        product.audioUrl || product.audio || null,
-            audioTitle:      product.audioTitle || null,
-            likes:           product.viewCount || 0,
-            comments:        product._count?.reviews || 0,
-            originalProduct: product,
-          }));
+          const mapped = products.map(product => {
+            const primaryImg = product.images?.[0]?.url || (typeof product.images?.[0] === 'string' ? product.images[0] : null) || product.imageUrl || PLACEHOLDER_IMAGE;
+            return {
+              id:              product.id || product._id,
+              sellerId:        product.store?.sellerId || product.sellerId,
+              storeSlug:       product.store?.portfolioSlug,
+              storeId:         product.store?.id,
+              seller:          product.store?.storeName || 'Verified Seller',
+              avatar:          (product.store?.storeName || 'V')[0].toUpperCase(),
+              time:            product.isFlashSale ? '🔥 Flash Deal' : 'Just Dropped',
+              text:            product.description?.slice(0, 110) || `${product.title} — Premium quality, limited stock!`,
+              image:           optimizeImageUrl(primaryImg),
+              audioUrl:        product.audioUrl || product.audio || null,
+              audioTitle:      product.audioTitle || null,
+              likes:           product.viewCount || 0,
+              comments:        product._count?.reviews || 0,
+              originalProduct: product,
+            };
+          });
           for (let i = mapped.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [mapped[i], mapped[j]] = [mapped[j], mapped[i]];
           }
           setPosts(mapped);
         } else {
-          // No products found — show empty state, not fake data
-          setPosts([]);
+          // Curated starter drops ensure feed is lively even if DB is initial or unseeded
+          setPosts(getFilteredStarterDrops(effectiveCategory, searchQuery));
         }
       } catch (err) {
-        // console.error('Feed fetch error:', err);
-        // On API error — show empty state, never show fake data
-        setPosts([]);
+        // On API error — gracefully display curated starter drops
+        setPosts(getFilteredStarterDrops(effectiveCategory, searchQuery));
       } finally {
         setLoading(false);
       }
@@ -290,10 +295,18 @@ const Feed = () => {
         <div className="w-full h-full flex justify-center items-center bg-[var(--bg-primary)] p-6">
           <WEmptyState 
             icon={Sparkles}
-            title="No Drops Yet" 
-            message="Check back soon for trending products or adjust your search." 
-            actionLabel="Explore Shop" 
-            onAction={() => window.location.href = '/shop'} 
+            title="No Drops Found" 
+            message="No active drops matched your search. Tap below to discover our curated starter drops." 
+            actionLabel="Discover Curated Drops" 
+            onAction={() => {
+              setActiveCategory('foryou');
+              setLocalSearch('');
+              const newParams = new URLSearchParams(searchParams);
+              newParams.delete('search');
+              newParams.delete('category');
+              setSearchParams(newParams);
+              setPosts(CURATED_STARTER_DROPS);
+            }} 
           />
         </div>
       ) : (

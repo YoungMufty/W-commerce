@@ -47,7 +47,7 @@ echo "    ✅ PostgreSQL database URL detected"
 
 # ── 4. Run database migrations ──────────────────────────────────────────────
 echo "[4/5] Running Prisma migrations..."
-npx prisma migrate deploy --schema=database/prisma/schema.prisma
+npx prisma migrate deploy --schema=database/prisma/postgres/schema.prisma
 echo "    ✅ Migrations applied"
 
 # ── 5. Verify frontend build ─────────────────────────────────────────────────

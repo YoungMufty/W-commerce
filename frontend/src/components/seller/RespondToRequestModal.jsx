@@ -45,7 +45,7 @@ const RespondToRequestModal = ({ isOpen, onClose, request }) => {
           {error && (
             <div className="bg-gray-500/10 border border-gray-500/50 text-gray-500 p-4 rounded-xl text-sm font-bold flex items-center gap-2">
               <AlertCircle size={18} />
-              {error}
+              {typeof error === 'object' ? (error?.message || error?.code || JSON.stringify(error)) : String(error || '')}
             </div>
           )}
           <div className="space-y-4">

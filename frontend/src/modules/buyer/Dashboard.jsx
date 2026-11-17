@@ -60,7 +60,7 @@ export default function BuyerDashboard() {
             <AlertTriangle size={32} />
           </div>
           <h2 className="text-xl font-bold">Unable to load dashboard</h2>
-          <p className="text-[var(--text-muted)]">{state.error}</p>
+          <p className="text-[var(--text-muted)]">{typeof state.error === 'object' ? (state.error?.message || state.error?.code || JSON.stringify(state.error)) : String(state.error || '')}</p>
           <WButton 
             variant="primary" 
             onClick={() => fetchDashboard(true)}

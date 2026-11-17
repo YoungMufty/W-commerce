@@ -145,7 +145,7 @@ const AuthGateModal = ({ onContinue }) => {
           />
           {error && (
             <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 rounded-xl p-3">
-              <AlertCircle size={16} /> {error}
+              <AlertCircle size={16} /> {typeof error === 'object' ? (error?.message || error?.code || JSON.stringify(error)) : String(error || '')}
             </div>
           )}
           <button

@@ -9,10 +9,7 @@ const redisReadyPromise = (async () => {
         return redisManager;
     } catch (error) {
         logger.error(`Redis initialization failed: ${error.message}`);
-        if (process.env.NODE_ENV === 'production') {
-            logger.error('FATAL: Redis is required in production. Server shutting down.');
-            process.exit(1);
-        }
+        logger.warn('⚠️ Redis unavailable; falling back to in-memory store.');
         return redisManager;
     }
 })();

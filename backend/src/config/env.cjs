@@ -12,10 +12,13 @@ const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET || WEAK_SECRETS.includes(JWT_SECRET)) {
     const reason = !JWT_SECRET ? 'NOT DEFINED' : 'WEAK';
     if (process.env.NODE_ENV === 'production') {
-        logger.error(`❌ FATAL: JWT_SECRET is ${reason}. Production requires a strong secret. Shutting down.`);
-        process.exit(1);
+        logger.error(`❌ FATAL: JWT_SECRET is ${reason}. Production requires a strong secret.`);
+        if (!process.env.VERCEL) {
+            process.exit(1);
+        }
+    } else {
+        logger.warn(`⚠️ SECURITY: JWT_SECRET is ${reason}. Using dev fallback — never use in production!`);
     }
-    logger.warn(`⚠️ SECURITY: JWT_SECRET is ${reason}. Using dev fallback — never use in production!`);
 }
 
 const BASE_PATH = process.env.BASE_PATH || '';

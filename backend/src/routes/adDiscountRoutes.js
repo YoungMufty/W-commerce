@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const prisma = require('../utils/prismaClient');
 const { protect } = require('../middleware/authMiddleware');
 const adDiscountService = require('../services/adDiscountService');
 
@@ -61,8 +62,6 @@ router.get('/status/:productId', protect, async (req, res) => {
 // Fetches all active discount sessions for the logged in user
 router.get('/my-sessions', protect, async (req, res) => {
   try {
-    const { PrismaClient } = require('@prisma/client');
-    const prisma = new PrismaClient();
     const sessions = await prisma.adDiscountSession.findMany({
       where: {
         buyerId: req.user.id,

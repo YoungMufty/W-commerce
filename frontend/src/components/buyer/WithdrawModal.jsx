@@ -105,7 +105,7 @@ const WithdrawModal = ({ isOpen, onClose, balance }) => {
             {error && (
               <div className="bg-gray-400 500/10 border border-gray-400 500/50 text-gray-700 500 p-4 rounded-xl flex items-start gap-3 text-sm">
                 <ShieldCheck className="flex-shrink-0 mt-0.5" size={16} />
-                <p>{error}</p>
+                <p>{typeof error === 'object' ? (error?.message || error?.code || JSON.stringify(error)) : String(error || '')}</p>
               </div>
             )}
 

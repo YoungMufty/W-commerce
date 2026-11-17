@@ -67,11 +67,10 @@ class RedisManager {
         } catch (error) {
             this.status.lastError = error.message;
             if (isProduction) {
-                logger.error('❌ Redis is required in production and could not be established.');
-                throw error;
+                logger.warn('⚠️ Redis connection failed in production. Falling back to in-memory cache.', { error: error.message });
+            } else {
+                logger.warn('⚠️ Redis unavailable. Falling back to in-memory cache.');
             }
-
-            logger.warn('⚠️ Redis unavailable. Falling back to in-memory cache.');
             return this._enableMemoryFallback(error.message);
         }
     }

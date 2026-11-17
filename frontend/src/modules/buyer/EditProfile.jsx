@@ -12,7 +12,7 @@ function FormField({ label, error, children }) {
     <div className="space-y-1.5">
       <label className="text-sm font-medium text-[var(--text-muted)]">{label}</label>
       {children}
-      {error && <p className="text-xs text-red-400 flex items-center gap-1"><AlertCircle size={11} />{error}</p>}
+      {error && <p className="text-xs text-red-400 flex items-center gap-1"><AlertCircle size={11} />{typeof error === 'object' ? (error?.message || error?.code || JSON.stringify(error)) : String(error || '')}</p>}
     </div>
   );
 }
@@ -174,7 +174,7 @@ export default function EditProfile({ onCancel }) {
           <p className="text-[var(--text-muted)] text-sm mt-1">Update your personal information</p>
           {serverError && (
              <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-sm flex items-center gap-2">
-                <AlertCircle size={16} /> {serverError}
+                <AlertCircle size={16} /> {typeof serverError === 'object' ? (serverError?.message || serverError?.code || JSON.stringify(serverError)) : String(serverError || '')}
              </div>
           )}
         </div>

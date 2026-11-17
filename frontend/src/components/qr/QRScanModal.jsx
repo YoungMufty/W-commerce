@@ -609,7 +609,7 @@ export default function QRScanModal({ isFullPage = false }) {
               <AlertCircle size={40} className="text-amber-400 mb-3" />
               <h4 className="text-base font-bold text-white mb-2">Camera Access Required</h4>
               <p className="text-xs text-slate-400 max-w-xs leading-relaxed mb-5">
-                {cameraError}
+                {typeof cameraError === 'object' ? (cameraError?.message || cameraError?.code || JSON.stringify(cameraError)) : String(cameraError || '')}
               </p>
               <div className="flex gap-2">
                 <button
@@ -705,7 +705,7 @@ export default function QRScanModal({ isFullPage = false }) {
               <div className="mt-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs max-w-sm flex items-start gap-2 text-left">
                 <AlertCircle size={16} className="shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="font-semibold">{fileError}</p>
+                  <p className="font-semibold">{typeof fileError === 'object' ? (fileError?.message || fileError?.code || JSON.stringify(fileError)) : String(fileError || '')}</p>
                   <p className="text-[10px] text-amber-300/80 mt-0.5">
                     Tip: Try cropping closer to the QR code, or use the camera tab directly.
                   </p>

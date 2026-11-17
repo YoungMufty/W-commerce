@@ -101,7 +101,7 @@ const SellerProfile = () => {
     return (
       <div className="min-h-screen pt-32 pb-12 px-6 flex flex-col items-center text-center bg-[#0a0a0a]">
         <h1 className="text-4xl font-extrabold text-white mb-4">Seller Not Found</h1>
-        <p className="text-gray-400 text-lg mb-8">{error}</p>
+        <p className="text-gray-400 text-lg mb-8">{typeof error === 'object' ? (error?.message || error?.code || JSON.stringify(error)) : String(error || '')}</p>
         <button onClick={() => navigate(-1)} className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition font-medium">Go Back</button>
       </div>
     );

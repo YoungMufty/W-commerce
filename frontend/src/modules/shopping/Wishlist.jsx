@@ -152,7 +152,7 @@ export default function Wishlist() {
             <AlertTriangle size={32} />
           </div>
           <h2 className="text-xl font-bold">Unable to load wishlist</h2>
-          <p className="text-[var(--text-muted)]">{errorMsg}</p>
+          <p className="text-[var(--text-muted)]">{typeof errorMsg === 'object' ? (errorMsg?.message || errorMsg?.code || JSON.stringify(errorMsg)) : String(errorMsg || '')}</p>
           <button 
             onClick={() => fetchWishlist(true)}
             className="flex items-center gap-2 justify-center w-full px-4 py-2 bg-[var(--text-main)] text-[var(--bg-primary)] rounded-xl font-semibold"

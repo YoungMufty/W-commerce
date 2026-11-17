@@ -84,7 +84,8 @@ const PackingAnimationModal = ({ order, onClose, onSuccess }) => {
       }, 1000));
     } catch (err) {
       if (!isMounted) return;
-      const errMsg = err.response?.data?.message || err.message || 'Failed to update order status.';
+      const rawMsg = err.response?.data?.message || (typeof err.response?.data === 'string' ? err.response.data : (err.message || 'Failed to update order status.'));
+      const errMsg = typeof rawMsg === 'object' ? (rawMsg?.message || JSON.stringify(rawMsg)) : String(rawMsg);
       setError(errMsg);
       toast.error(errMsg);
     }
@@ -157,7 +158,7 @@ const PackingAnimationModal = ({ order, onClose, onSuccess }) => {
           {error ? (
             <div className="w-full space-y-4">
               <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-center">
-                <p className="text-xs text-rose-300 font-medium leading-relaxed">{error}</p>
+                <p className="text-xs text-rose-300 font-medium leading-relaxed">{typeof error === 'object' ? (error?.message || error?.code || JSON.stringify(error)) : String(error || '')}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3 pt-2">

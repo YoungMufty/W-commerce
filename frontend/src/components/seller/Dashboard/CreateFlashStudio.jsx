@@ -156,7 +156,7 @@ const CreateFlashStudio = ({ onSuccess }) => {
               {error && (
                 <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 bg-red-50 border-[3px] border-red-200 text-red-600 p-4 rounded-xl flex items-center gap-3 text-sm font-bold">
                   <AlertCircle size={18} />
-                  {error}
+                  {typeof error === 'object' ? (error?.message || error?.code || JSON.stringify(error)) : String(error || '')}
                 </motion.div>
               )}
 
@@ -245,7 +245,7 @@ const CreateFlashStudio = ({ onSuccess }) => {
               {error && (
                 <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 bg-red-50 border-[3px] border-red-200 text-red-600 p-4 rounded-xl flex items-center gap-3 text-sm font-bold">
                   <AlertCircle size={18} />
-                  {error}
+                  {typeof error === 'object' ? (error?.message || error?.code || JSON.stringify(error)) : String(error || '')}
                 </motion.div>
               )}
 

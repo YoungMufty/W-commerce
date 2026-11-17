@@ -95,7 +95,8 @@ function createInMemoryDelegate() {
     }
 });
 
-if (!isProduction) globalForPrisma.prisma = prisma;
+// Always assign to globalThis so serverless invocations and module reloads reuse the singleton instance
+globalForPrisma.prisma = prisma;
 
 // ── Graceful disconnect on process exit ──────────────────────────────────────
 // Prevents "Connection pool timed out" on clean restarts.
@@ -115,8 +116,18 @@ process.on('SIGTERM', disconnectPrisma);
 process.on('SIGINT', disconnectPrisma);
 
 // ── Startup connectivity check ───────────────────────────────────────────────
-// Called once at server startup. Exits with code 1 if DB is unreachable after retries.
+// Called once at server startup. Exits with code 1 if DB is unreachable after retries (standalone only).
+// In Vercel serverless, warns and logs clearly instead of calling process.exit(1) to prevent FUNCTION_INVOCATION_FAILED.
 async function verifyDatabaseConnection(retries = 3, delayMs = 2000) {
+    if (!process.env.DATABASE_URL) {
+        logger.error('[Prisma] ❌ DATABASE_URL is not configured. Database operations will be unavailable.');
+        if (isProduction && !process.env.VERCEL) {
+            logger.error('[Prisma] Exiting process in standalone production due to missing DATABASE_URL');
+            process.exit(1);
+        }
+        return false;
+    }
+
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
             await prisma.$queryRaw`SELECT 1`;
@@ -129,12 +140,12 @@ async function verifyDatabaseConnection(retries = 3, delayMs = 2000) {
                 delayMs = Math.min(delayMs * 2, 10000); // exponential backoff, max 10s
             } else {
                 logger.error(`[Prisma] ❌ Could not connect to database after ${retries} attempts: ${err.message}`);
-                if (isProduction) {
-                    logger.error('[Prisma] Exiting process in production due to DB unavailability');
+                if (isProduction && !process.env.VERCEL) {
+                    logger.error('[Prisma] Exiting process in standalone production due to DB unavailability');
                     process.exit(1);
                 }
-                // In development, warn but don't exit — allows starting server without DB for UI dev
-                logger.warn('[Prisma] ⚠️  Running without database in development mode');
+                // In serverless / development, warn but do not hard-crash the runtime container
+                logger.warn('[Prisma] ⚠️  Running in degraded mode without verified database connection');
                 return false;
             }
         }

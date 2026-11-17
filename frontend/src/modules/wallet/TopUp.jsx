@@ -97,7 +97,7 @@ export default function TopUp() {
         {errorMsg && (
           <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl flex items-start gap-3">
             <AlertTriangle size={20} className="shrink-0 mt-0.5" />
-            <p className="text-sm">{errorMsg}</p>
+            <p className="text-sm">{typeof errorMsg === 'object' ? (errorMsg?.message || errorMsg?.code || JSON.stringify(errorMsg)) : String(errorMsg || '')}</p>
           </div>
         )}
 

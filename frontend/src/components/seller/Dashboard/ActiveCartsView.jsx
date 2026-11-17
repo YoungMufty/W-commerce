@@ -136,7 +136,7 @@ const SendOfferModal = ({ cartGroup, onClose }) => {
             <div className="p-6 space-y-5">
               {error && (
                 <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm font-medium">
-                  {error}
+                  {typeof error === 'object' ? (error?.message || error?.code || JSON.stringify(error)) : String(error || '')}
                 </div>
               )}
               {/* Buyer + Cart summary */}

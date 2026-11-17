@@ -103,7 +103,7 @@ const CouriersView = () => {
         ) : error ? (
           <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 flex items-center gap-2">
             <CheckCircle2 className="text-red-500" />
-            {error}
+            {typeof error === 'object' ? (error?.message || error?.code || JSON.stringify(error)) : String(error || '')}
           </div>
         ) : filteredCouriers.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-2xl border border-gray-100 shadow-sm">

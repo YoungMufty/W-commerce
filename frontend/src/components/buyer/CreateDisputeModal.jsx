@@ -213,7 +213,7 @@ const CreateDisputeModal = ({ isOpen, onClose, orders, initialOrderId }) => {
         setError('Failed to open dispute. Please check your network and try again.');
       }
     } catch (err) {
-      setError(err.message || 'Error creating dispute.');
+      setError(err.response?.data?.message || err.message || 'Error creating dispute.');
     } finally {
       setIsSubmitting(false);
     }
@@ -255,7 +255,7 @@ const CreateDisputeModal = ({ isOpen, onClose, orders, initialOrderId }) => {
         {error && (
           <div className="mx-6 mt-4 p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-400 text-xs flex items-center gap-2">
             <AlertCircle size={16} className="flex-shrink-0" />
-            <span>{error}</span>
+            <span>{typeof error === 'object' ? (error?.message || error?.code || JSON.stringify(error)) : String(error || '')}</span>
           </div>
         )}
 

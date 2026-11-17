@@ -1135,7 +1135,7 @@ const ProductDetails = () => {
 
               <div className="bg-gray-500/20 border border-gray-500/50 text-gray-400 p-3 rounded mb-4 text-sm">
 
-                {reviewError}
+                {typeof reviewError === 'object' ? (reviewError?.message || reviewError?.code || JSON.stringify(reviewError)) : String(reviewError || '')}
 
               </div>
 

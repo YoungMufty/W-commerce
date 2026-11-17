@@ -2,6 +2,7 @@ const prisma = require('../utils/prismaClient');
 const logger = require('../utils/logger');
 const flashDealService = require('../services/flashDealService');
 const promoCampaignService = require('../services/promoCampaignService');
+const { STARTER_FLASH_DEALS } = require('../data/starterProducts');
 
 function priceToNumber(value) {
     const numericValue = Number(value);
@@ -311,14 +312,27 @@ exports.getActiveFlashDeals = async (req, res) => {
             take: limit
         });
 
+        let mappedDeals = flashDeals.map(buildDealMeta);
+        if (mappedDeals.length === 0) {
+            mappedDeals = STARTER_FLASH_DEALS.slice(0, limit);
+        }
+
+        const campaigns = (await promoCampaignService.getHomepageCampaigns(6).catch(() => [])) || [];
+
         res.json({
             success: true,
-            flashDeals: flashDeals.map(buildDealMeta),
-            campaigns: await promoCampaignService.getHomepageCampaigns(6)
+            count: mappedDeals.length,
+            flashDeals: mappedDeals,
+            campaigns
         });
     } catch (error) {
         logger.error(`Get Active Flash Deals Error: ${error.message}`);
-        res.status(500).json({ success: false, message: 'Server error' });
+        res.json({
+            success: true,
+            count: STARTER_FLASH_DEALS.length,
+            flashDeals: STARTER_FLASH_DEALS,
+            campaigns: []
+        });
     }
 };
 

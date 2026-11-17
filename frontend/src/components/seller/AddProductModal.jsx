@@ -133,7 +133,8 @@ const AddProductModal = ({ isOpen, onClose }) => {
         if (typeof removeAudio === 'function') removeAudio();
       } else {
         console.error("Create Product Error:", useSellerStore.getState().error);
-        setSubmitError(useSellerStore.getState().error || 'Failed to create product. Please try again.');
+        const storeErr = useSellerStore.getState().error;
+        setSubmitError(typeof storeErr === 'object' ? (storeErr?.message || storeErr?.code || JSON.stringify(storeErr)) : (storeErr || 'Failed to create product. Please try again.'));
       }
     };
 
@@ -164,7 +165,7 @@ const AddProductModal = ({ isOpen, onClose }) => {
           {submitError && (
             <div className="bg-[#d3d3d3]/10 border border-[#d3d3d3]/30 text-[#d3d3d3] p-4 rounded-xl text-sm font-bold flex items-start gap-3 shadow-[0_0_20px_rgba(255,0,60,0.1)]">
               <AlertCircle size={20} className="shrink-0 mt-0.5" />
-              <span>{submitError}</span>
+              <span>{typeof submitError === 'object' ? (submitError?.message || submitError?.code || JSON.stringify(submitError)) : String(submitError || '')}</span>
             </div>
           )}
           <div className="space-y-4">

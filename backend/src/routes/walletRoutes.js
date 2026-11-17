@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const prisma = require('../utils/prismaClient');
 const walletController = require('../controllers/walletController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 const { validate } = require('../middleware/inputValidation');
@@ -33,8 +34,6 @@ router.post('/withdraw', protect, validate('walletWithdraw'), async (req, res) =
         const userId = req.user.id;
         
         // --- PIN Verification ---
-        const { PrismaClient } = require('@prisma/client');
-        const prisma = new PrismaClient();
         const user = await prisma.user.findUnique({ where: { id: userId } });
         if (!user.withdrawPin) {
             return res.status(403).json({ success: false, message: 'PIN_NOT_SET', details: 'Please set your withdrawal PIN first' });

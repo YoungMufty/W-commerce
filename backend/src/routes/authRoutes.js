@@ -63,114 +63,176 @@ router.delete('/sessions/:sessionId', protect, authController.revokeSession);
 // Social Login Routes (Google/Apple)
 // ============================================
 
+const { isGoogleOAuthConfigured } = require('../services/passport');
+
+// Safe helper to check if Google OAuth strategy is ready to serve requests
+const isGoogleStrategyReady = () => {
+    try {
+        if (!isGoogleOAuthConfigured()) return false;
+        const passport = require('passport');
+        const hasStrategy = Boolean(
+            (passport._strategies && passport._strategies.google) ||
+            (typeof passport._strategy === 'function' && passport._strategy('google'))
+        );
+        return hasStrategy;
+    } catch (e) {
+        return false;
+    }
+};
+
 // Google OAuth routes - uses Passport.js when configured
 router.get('/google', (req, res, next) => {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5175';
+    const frontendUrl = (process.env.FRONTEND_URL || 'https://w-commerce-1yqf-nine.vercel.app').replace(/\/+$/, '');
+
+    // Bulletproof guard: check if Google OAuth credentials and strategy are ready
+    if (!isGoogleStrategyReady()) {
+        logger.warn('Google OAuth requested but strategy or credentials are not configured.');
+        if (req.headers.accept && req.headers.accept.includes('application/json')) {
+            return res.status(200).json({
+                success: false,
+                message: 'Google OAuth is not configured on this environment.'
+            });
+        }
+        return res.redirect(`${frontendUrl}/login?error=oauth_not_configured`);
+    }
+
     try {
         const passport = require('passport');
 
-        // Check if Google strategy is registered
-        if (!passport._strategies || !passport._strategies.google) {
-              logger.warn('Google OAuth strategy not configured. Redirect to login with error.');
-              return res.redirect(`${frontendUrl}/login?error=google_not_configured`);
-          }
-  
-          // Store return URL in session if present
-          if (req.query.returnUrl && req.session) {
-              req.session.returnUrl = req.query.returnUrl;
-          }
-  
-          // Trigger Google OAuth flow
-          passport.authenticate('google', {
-              scope: ['profile', 'email'],
-              prompt: 'select_account' // Always show account picker
-          })(req, res, next);
-  
-      } catch (err) {
-          logger.error(`Google OAuth initiation error: ${err.message}`);
-          res.redirect(`${frontendUrl}/login?error=google_unavailable`);
-      }
-  });
-  
-  router.get('/google/callback',
-      (req, res, next) => {
-          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5175';
-          try {
-              const passport = require('passport');
-  
-              if (!passport._strategies || !passport._strategies.google) {
-                  return res.redirect(`${frontendUrl}/login?error=google_not_configured`);
-              }
-  
-              passport.authenticate('google', { session: false }, (err, user, info) => {
-                  if (err) {
-                      logger.error(`Google authenticate error: ${err.message}`);
-                      // If it's a TokenError (e.g. reused code, invalid secret), redirect to login
-                      return res.redirect(`${frontendUrl}/login?error=google_callback_failed`);
-                  }
-                  if (!user) {
-                      return res.redirect(`${frontendUrl}/login?error=google_auth_failed`);
-                  }
-                  req.user = user;
-                  next();
-              })(req, res, next);
-          } catch (err) {
-              logger.error(`Google callback error: ${err.message}`);
-              res.redirect(`${frontendUrl}/login?error=google_callback_failed`);
-          }
-      },
-      (req, res) => {
-          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5175';
-          try {
-              // User is now in req.user (from Passport)
-              const user = req.user;
-  
-              // Generate JWT token
-              const token = jwt.sign(
-                  { id: user.id, role: user.role, email: user.email },
-                  getJwtSecret(),
-                  { expiresIn: '30d' }
-              );
-  
-              // Record session
-              const prisma = require('../utils/prismaClient');
-              prisma.userSession.create({
-                  data: {
-                      userId: user.id,
-                      token: token,
-                      userAgent: req.headers['user-agent'] || null,
-                      ipAddress: req.ip || req.connection?.remoteAddress || null,
-                      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-                  }
-              }).catch(err => logger.error(`Google OAuth session creation error: ${err.message}`));
+        // Store return URL in session if present
+        if (req.query.returnUrl && req.session) {
+            req.session.returnUrl = req.query.returnUrl;
+        }
 
-              // Set httpOnly cookie
-              res.cookie('token', token, {
-                  httpOnly: true,
-                  secure: process.env.NODE_ENV === 'production' && !req.hostname.includes('localhost') && !req.hostname.includes('127.0.0.1'),
-                  sameSite: 'lax',
-                  maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
-              });
-  
-              // Determine redirect URL
-              let returnPath = req.session?.returnUrl || '/';
-              if (req.session?.returnUrl) {
-                  delete req.session.returnUrl;
-              }
-              
-              // Ensure returnPath starts with / and doesn't contain a domain to avoid open redirect vulnerabilities
-              if (!returnPath.startsWith('/')) returnPath = '/' + returnPath;
-              const returnUrl = frontendUrl + returnPath;
-  
-              logger.info(`User logged in via Google OAuth: ${user.email}`);
-              res.redirect(returnUrl);
-  
-          } catch (err) {
-              logger.error(`Google OAuth token generation error: ${err.message}`);
-              res.redirect(`${frontendUrl}/login?error=token_generation_failed`);
-          }
-      }
-  );
+        // Trigger Google OAuth flow safely - intercept errors rather than letting next(err) crash with 500
+        passport.authenticate('google', {
+            scope: ['profile', 'email'],
+            prompt: 'select_account' // Always show account picker
+        })(req, res, (err) => {
+            if (err) {
+                logger.error(`Google OAuth initiation error: ${err.message}`);
+                if (req.headers.accept && req.headers.accept.includes('application/json')) {
+                    return res.status(200).json({
+                        success: false,
+                        message: 'Google OAuth is not configured on this environment.'
+                    });
+                }
+                return res.redirect(`${frontendUrl}/login?error=oauth_not_configured`);
+            }
+            next();
+        });
+
+    } catch (err) {
+        logger.error(`Google OAuth initiation catch error: ${err.message}`);
+        if (req.headers.accept && req.headers.accept.includes('application/json')) {
+            return res.status(200).json({
+                success: false,
+                message: 'Google OAuth is not configured on this environment.'
+            });
+        }
+        return res.redirect(`${frontendUrl}/login?error=oauth_not_configured`);
+    }
+});
+
+router.get('/google/callback',
+    (req, res, next) => {
+        const frontendUrl = (process.env.FRONTEND_URL || 'https://w-commerce-1yqf-nine.vercel.app').replace(/\/+$/, '');
+
+        // Bulletproof guard: check if Google strategy is configured before attempting callback
+        if (!isGoogleStrategyReady()) {
+            logger.warn('Google OAuth callback attempted but Google is not configured.');
+            if (req.headers.accept && req.headers.accept.includes('application/json')) {
+                return res.status(200).json({
+                    success: false,
+                    message: 'Google OAuth is not configured on this environment.'
+                });
+            }
+            return res.redirect(`${frontendUrl}/login?error=oauth_not_configured`);
+        }
+
+        try {
+            const passport = require('passport');
+
+            passport.authenticate('google', { session: false }, (err, user, info) => {
+                if (err) {
+                    logger.error(`Google authenticate error: ${err.message}`);
+                    return res.redirect(`${frontendUrl}/login?error=google_callback_failed`);
+                }
+                if (!user) {
+                    logger.warn('Google authenticate returned no user');
+                    return res.redirect(`${frontendUrl}/login?error=google_auth_failed`);
+                }
+                req.user = user;
+                next();
+            })(req, res, (err) => {
+                if (err) {
+                    logger.error(`Google authenticate callback dispatch error: ${err.message}`);
+                    return res.redirect(`${frontendUrl}/login?error=google_callback_failed`);
+                }
+                next();
+            });
+        } catch (err) {
+            logger.error(`Google callback catch error: ${err.message}`);
+            return res.redirect(`${frontendUrl}/login?error=google_callback_failed`);
+        }
+    },
+    (req, res) => {
+        const frontendUrl = (process.env.FRONTEND_URL || 'https://w-commerce-1yqf-nine.vercel.app').replace(/\/+$/, '');
+        try {
+            // User is now in req.user (from Passport)
+            const user = req.user;
+            if (!user) {
+                return res.redirect(`${frontendUrl}/login?error=google_auth_failed`);
+            }
+
+            // Generate JWT token
+            const token = jwt.sign(
+                { id: user.id, role: user.role, email: user.email },
+                getJwtSecret(),
+                { expiresIn: '30d' }
+            );
+
+            // Record session
+            const prisma = require('../utils/prismaClient');
+            prisma.userSession.create({
+                data: {
+                    userId: user.id,
+                    token: token,
+                    userAgent: req.headers['user-agent'] || null,
+                    ipAddress: req.ip || req.connection?.remoteAddress || null,
+                    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                }
+            }).catch(err => logger.error(`Google OAuth session creation error: ${err.message}`));
+
+            // Set httpOnly cookie
+            res.cookie('token', token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production' && !req.hostname.includes('localhost') && !req.hostname.includes('127.0.0.1'),
+                sameSite: 'lax',
+                maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+            });
+
+            // Determine redirect URL
+            let returnPath = req.session?.returnUrl || '/';
+            if (req.session?.returnUrl) {
+                delete req.session.returnUrl;
+            }
+
+            // Ensure returnPath starts with / and doesn't contain a domain or protocol to avoid open redirect vulnerabilities
+            if (!returnPath.startsWith('/') || returnPath.startsWith('//')) {
+                returnPath = '/';
+            }
+            const returnUrl = frontendUrl + returnPath;
+
+            logger.info(`User logged in via Google OAuth: ${user.email}`);
+            return res.redirect(returnUrl);
+
+        } catch (err) {
+            logger.error(`Google OAuth token generation error: ${err.message}`);
+            return res.redirect(`${frontendUrl}/login?error=token_generation_failed`);
+        }
+    }
+);
 
 // Apple Sign In
 router.post('/apple', rateLimiters.login, authController.appleLogin);

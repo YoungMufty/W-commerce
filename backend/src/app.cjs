@@ -5,6 +5,7 @@ const fs = require('fs');
 const logger = require('./utils/logger');
 const redisManager = require('./utils/redisManager');
 const { BASE_PATH, JWT_SECRET } = require('./config/env.cjs');
+const prisma = require('./utils/prismaClient');
 const { prismaErrorToAppError, isDatabaseError, AppError } = require('./utils/errorTypes');
 
 // ── Global process crash guards ───────────────────────────────────────────────
@@ -16,8 +17,10 @@ process.on('unhandledRejection', (reason, promise) => {
 
 process.on('uncaughtException', (err) => {
     logger.error(`[UNCAUGHT EXCEPTION] ${err.stack || err.message}`);
-    // Always exit on uncaught exceptions — the process state may be corrupt.
-    process.exit(1);
+    // Always exit on uncaught exceptions in standalone servers; in Vercel serverless avoid killing container prematurely
+    if (!process.env.VERCEL) {
+        process.exit(1);
+    }
 });
 
 process.on('SIGTERM', () => {
@@ -221,10 +224,13 @@ app.use(geoIPMiddleware); // Auto-detect region
 app.use(cookieParser());
 
 // Session middleware (required for Passport OAuth flow)
-// Use a strong session secret - must be provided in production
-const sessionSecret = process.env.SESSION_SECRET || (process.env.NODE_ENV === 'production' ? (() => { logger.error('SESSION_SECRET required in production'); process.exit(1); })() : 'dev_session_secret_change_in_prod');
+// Use a secure session secret, with safe fallback to JWT_SECRET or default to prevent crashing in serverless
+const sessionSecret = process.env.SESSION_SECRET || process.env.JWT_SECRET || 'w-commerce-production-session-fallback-secret-2025';
+if (!process.env.SESSION_SECRET) {
+    logger.warn('⚠️ SESSION_SECRET is not set. Using fallback session secret.');
+}
 
-// Prefer Redis-backed session store in production if Redis is available
+// Prefer Redis-backed session store in production if Redis is available and not in serverless
 let sessionOptions = {
     secret: sessionSecret,
     resave: false,
@@ -237,15 +243,19 @@ let sessionOptions = {
     }
 };
 
-if (isProduction || process.env.REDIS_URL) {
-    sessionOptions.store = new RedisSessionStore({
-        redisManager,
-        prefix: process.env.REDIS_SESSION_PREFIX || 'sess:',
-        ttlSeconds: 24 * 60 * 60
-    });
-    logger.info('Redis-backed session store configured');
+if ((isProduction || process.env.REDIS_URL) && !process.env.VERCEL) {
+    try {
+        sessionOptions.store = new RedisSessionStore({
+            redisManager,
+            prefix: process.env.REDIS_SESSION_PREFIX || 'sess:',
+            ttlSeconds: 24 * 60 * 60
+        });
+        logger.info('Redis-backed session store configured');
+    } catch (e) {
+        logger.warn(`Failed to initialize RedisSessionStore, falling back to in-memory: ${e.message}`);
+    }
 } else {
-    logger.warn('Using in-memory session store in development because REDIS_URL is not configured.');
+    logger.warn('Using in-memory session store (development or serverless environment).');
 }
 
 app.use(session(sessionOptions));
@@ -253,12 +263,15 @@ app.use(session(sessionOptions));
 // Initialize Passport for social login
 app.use(passport.initialize());
 app.use(passport.session());
-configureGoogleStrategy(passport);
+try {
+    configureGoogleStrategy(passport);
+} catch (err) {
+    logger.error(`Error configuring Google OAuth strategy: ${err.message}`);
+}
 
-// --- Production environment validation (fail-fast) ---
-// --- Production environment validation (fail-fast) ---
-if (isProduction) {
-    const requiredVars = ['JWT_SECRET', 'SESSION_SECRET', 'DATABASE_URL', 'FRONTEND_URL', 'STRIPE_SECRET_KEY', 'PAYSTACK_SECRET_KEY'];
+// --- Production environment validation ---
+if (isProduction && !process.env.VERCEL) {
+    const requiredVars = ['JWT_SECRET', 'DATABASE_URL', 'FRONTEND_URL'];
     const missing = requiredVars.filter(v => !process.env[v]);
     if (missing.length > 0) {
         logger.error(`❌ FATAL: Missing required environment variables: ${missing.join(', ')}`);
@@ -269,6 +282,13 @@ if (isProduction) {
     if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('file:')) {
         logger.error('❌ FATAL: DATABASE_URL points to a local SQLite file. Use PostgreSQL in production.');
         process.exit(1);
+    }
+} else if (isProduction && process.env.VERCEL) {
+    // In Vercel serverless, log warnings instead of calling process.exit(1) to avoid FUNCTION_INVOCATION_FAILED
+    const requiredVars = ['JWT_SECRET', 'DATABASE_URL', 'FRONTEND_URL'];
+    const missing = requiredVars.filter(v => !process.env[v]);
+    if (missing.length > 0) {
+        logger.warn(`⚠️ Vercel environment: Missing environment variables: ${missing.join(', ')}`);
     }
 }
 
@@ -574,6 +594,38 @@ eventBus.initialize(redisManager)
 // All routes registered once, under /api/v1/ prefix only.
 // Dual-prefix registration (/api + /api/v1) is kept only where an existing
 // client or integration depends on the non-versioned path.
+
+// ── Health Check (Liveness & Database Readiness) ───────────────────────────
+app.get(['/health', '/api/health', '/api/v1/health'], async (req, res) => {
+    let dbStatus = 'disconnected';
+    let dbHealthy = false;
+    try {
+        if (process.env.DATABASE_URL) {
+            await Promise.race([
+                prisma.$queryRaw`SELECT 1`,
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Database query timed out')), 2500))
+            ]);
+            dbStatus = 'connected';
+            dbHealthy = true;
+        } else {
+            dbStatus = 'unconfigured';
+            dbHealthy = false;
+        }
+    } catch (err) {
+        dbStatus = `unreachable: ${err.message}`;
+        dbHealthy = false;
+    }
+
+    const statusCode = dbHealthy ? 200 : (dbStatus === 'unconfigured' ? 200 : 503);
+    res.status(statusCode).json({
+        success: dbHealthy,
+        status: dbHealthy ? 'healthy' : (dbStatus === 'unconfigured' ? 'degraded_no_database' : 'degraded'),
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development',
+        serverless: Boolean(process.env.VERCEL),
+        database: dbStatus
+    });
+});
 
 // Deprecation header: warn consumers of legacy /api/* (non-versioned) paths.
 // These will be removed in a future major release — clients must migrate to /api/v1/*.

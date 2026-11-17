@@ -73,7 +73,7 @@ const TrackingModal = ({ isOpen, onClose, orderId }) => {
 
   const renderTimeline = () => {
     if (loading) return <div className="space-y-4"><GXSkeleton variant="card" /><GXSkeleton variant="card" /></div>;
-    if (error) return <div className="text-gray-700 500 text-center">{error}</div>;
+    if (error) return <div className="text-gray-700 500 text-center">{typeof error === 'object' ? (error?.message || error?.code || JSON.stringify(error)) : String(error || '')}</div>;
     if (!trackingData || !trackingData.events || trackingData.events.length === 0) {
       return <div className="text-center text-[var(--text-muted)] py-8">No tracking events available yet.</div>;
     }

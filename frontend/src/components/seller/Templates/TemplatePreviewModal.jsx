@@ -118,7 +118,7 @@ const TemplatePreviewModal = ({ template, ownedRecord, onClose, onPurchaseSucces
           </div>
 
           <div className="flex items-center gap-4">
-            {error && <div className="text-red-500 text-sm font-bold">{error}</div>}
+            {error && <div className="text-red-500 text-sm font-bold">{typeof error === 'object' ? (error?.message || error?.code || JSON.stringify(error)) : String(error || '')}</div>}
             
             {isOwned ? (
               <button 

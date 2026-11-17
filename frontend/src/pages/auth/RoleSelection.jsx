@@ -166,7 +166,7 @@ const RoleSelection = () => {
                   className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl text-sm flex items-start gap-3 mt-6"
                 >
                   <WIcon name="alert-circle" size={18} className="shrink-0 mt-0.5" />
-                  <p>{error}</p>
+                  <p>{typeof error === 'object' ? (error?.message || error?.code || JSON.stringify(error)) : String(error || '')}</p>
                 </motion.div>
               )}
             </AnimatePresence>

@@ -180,7 +180,7 @@ export default function ChooseCountryCurrency() {
               {detectError && (
                 <div className="mt-2 text-xs text-red-400 flex items-center gap-1">
                   <AlertTriangle size={12} />
-                  {detectError}
+                  {typeof detectError === 'object' ? (detectError?.message || detectError?.code || JSON.stringify(detectError)) : String(detectError || '')}
                 </div>
               )}
             </div>
