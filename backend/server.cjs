@@ -19,9 +19,7 @@ const logger = require('./src/utils/logger');
 const { redisManager, redisReadyPromise } = require('./src/config/redis.cjs');
 
 const http = require('http');
-
 const fs = require('fs');
-const { initializeSockets } = require('./src/sockets/index.js');
 const jwt = require('jsonwebtoken');
 const prisma = require('./src/utils/prismaClient');
 
@@ -106,6 +104,7 @@ if (!process.env.VERCEL) {
     globalStartup.server = server;
     try {
         logger.info('Initializing socket connections...');
+        const { initializeSockets } = require('./src/sockets/index.js');
         const { io } = initializeSockets(server, globalStartup);
         logger.info('Socket connections initialized');
     } catch (e) {
