@@ -260,7 +260,7 @@ const NotificationBell = () => {
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: '100%', opacity: 0 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className="w-full sm:max-w-xl md:max-w-2xl bg-[var(--bg-secondary)] border-t sm:border border-[var(--border-color)] rounded-t-3xl sm:rounded-3xl shadow-2xl relative max-h-[85vh] sm:max-h-[88vh] overflow-hidden flex flex-col"
+                className="w-full sm:max-w-xl md:max-w-2xl bg-[var(--bg-secondary)] border-t sm:border border-[var(--border-color)] rounded-t-[28px] sm:rounded-3xl shadow-2xl relative max-h-[85vh] sm:max-h-[88vh] overflow-hidden flex flex-col"
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Drag Handle indicator on mobile (matches Banning Rate bottom sheet) */}
@@ -276,10 +276,10 @@ const NotificationBell = () => {
                     </div>
                     <button 
                       onClick={() => setIsOpen(false)} 
-                      className="w-8 h-8 rounded-full bg-[var(--bg-tertiary)] hover:bg-[var(--accent-gray)]/20 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
+                      className="w-8 h-8 rounded-full bg-[var(--bg-tertiary)] hover:bg-[var(--accent-gray)]/20 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors cursor-pointer text-sm font-bold"
                       aria-label="Close notifications"
                     >
-                      <X size={18} />
+                      ✕
                     </button>
                   </div>
                   <div className="px-5 pb-3 sm:pb-4 flex gap-2">
@@ -315,7 +315,7 @@ const NotificationBell = () => {
                 </div>
 
                 {/* List */}
-                <div className="overflow-y-auto flex-1 pb-6">
+                <div className="overflow-y-auto overflow-x-hidden flex-1 pb-8 sm:pb-6">
                   {isLoading ? (
                     <div className="flex items-center justify-center h-32">
                       <div className="w-6 h-6 border-2 border-[var(--accent-gray)] border-t-transparent rounded-full animate-spin" />
@@ -326,7 +326,7 @@ const NotificationBell = () => {
                       <p className="text-sm">All caught up!</p>
                     </div>
                   ) : (
-                    <div className="divide-y divide-[var(--accent-gray)]/30">
+                    <div className="divide-y divide-[var(--border-color)]">
                       {notifications.map(notif => {
                         const Icon = iconMap[notif.type] || Info;
                         return (
@@ -338,7 +338,7 @@ const NotificationBell = () => {
                             }}
                             className={`flex gap-3 p-4 hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer group ${!notif.isRead ? 'bg-[var(--accent-gray)]/10' : ''}`}
                           >
-                            <div className={`p-2 rounded-xl flex-shrink-0 self-start ${!notif.isRead ? 'bg-[var(--accent-gray)] shadow-[0_0_15px_var(--accent-gray-dim)] text-black' : 'bg-gray-100 text-gray-500'}`}>
+                            <div className={`p-2 rounded-xl flex-shrink-0 self-start ${!notif.isRead ? 'bg-[var(--accent-gray)] shadow-[0_0_15px_var(--accent-gray-dim)] text-black' : 'bg-gray-100 dark:bg-white/10 text-gray-500 dark:text-gray-400'}`}>
                               <Icon size={18} />
                             </div>
                             <div className="flex-1 min-w-0">
@@ -385,7 +385,7 @@ const NotificationBell = () => {
                                         onKeyDown={(e) => {
                                           if (e.key === 'Enter') sendQuickReply(notif, e);
                                         }}
-                                        className="flex-1 bg-[var(--bg-tertiary)] text-xs text-black px-3 py-1.5 rounded-lg border border-[var(--accent-gray)] shadow-[0_0_10px_var(--accent-gray-dim)] focus:outline-none focus:border-[var(--accent-gray)] transition-colors"
+                                        className="flex-1 bg-[var(--bg-tertiary)] text-xs text-[var(--text-main)] px-3 py-1.5 rounded-lg border border-[var(--border-color)] focus:border-[var(--accent-gray)] shadow-[0_0_10px_var(--accent-gray-dim)] focus:outline-none transition-colors"
                                      />
                                      <button 
                                         onClick={(e) => sendQuickReply(notif, e)}
@@ -399,21 +399,21 @@ const NotificationBell = () => {
                               )}
 
                               {notif.type === 'CART_ADD' && (
-                                <div className="mt-3 bg-[var(--bg-primary)] p-2.5 rounded-xl border border-[var(--accent-gray)] shadow-[0_0_10px_var(--accent-gray-dim)] cursor-default" onClick={e => e.stopPropagation()}>
+                                <div className="mt-3 bg-[var(--bg-primary)] p-2.5 rounded-xl border border-[var(--border-color)] shadow-sm cursor-default" onClick={e => e.stopPropagation()}>
                                   <p className="text-xs font-bold text-[var(--text-muted)] mb-2 flex items-center gap-1"><MessageSquare size={12}/> Quick Reply to Buyer</p>
                                   <div className="flex flex-wrap gap-2 mb-2">
                                      <button 
                                         onClick={() => handleQuickReplyChange(notif.id, 'Do you need more details about the product?')}
-                                        className="text-[10px] px-2 py-1 bg-[var(--bg-tertiary)] border border-[var(--accent-gray)] shadow-[0_0_10px_var(--accent-gray-dim)] rounded hover:bg-[var(--accent-gray)]/20 transition-colors text-black"
+                                        className="text-[10px] px-2 py-1 bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded hover:bg-[var(--accent-gray)]/20 transition-colors text-[var(--text-main)]"
                                      >
                                         Need details?
                                      </button>
-                                     <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] border border-[var(--accent-gray)] shadow-[0_0_10px_var(--accent-gray-dim)] rounded px-1">
+                                     <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded px-1">
                                         <input 
                                            type="number" 
                                            placeholder="%"
                                            id={`discount-${notif.id}`}
-                                           className="w-10 bg-transparent text-[10px] text-black text-center focus:outline-none" 
+                                           className="w-10 bg-transparent text-[10px] text-[var(--text-main)] text-center focus:outline-none" 
                                         />
                                         <button 
                                            onClick={(e) => generatePromo(notif, e)}
@@ -429,7 +429,7 @@ const NotificationBell = () => {
                                         value={replyTexts[notif.id] || ''} 
                                         onChange={e => handleQuickReplyChange(notif.id, e.target.value)}
                                         placeholder="Type a message..."
-                                        className="flex-1 bg-[var(--bg-tertiary)] text-xs text-black px-3 py-1.5 rounded-lg border border-[var(--accent-gray)] shadow-[0_0_10px_var(--accent-gray-dim)] focus:outline-none focus:border-[var(--accent-gray)] transition-colors"
+                                        className="flex-1 bg-[var(--bg-tertiary)] text-xs text-[var(--text-main)] px-3 py-1.5 rounded-lg border border-[var(--border-color)] focus:border-[var(--accent-gray)] shadow-[0_0_10px_var(--accent-gray-dim)] focus:outline-none transition-colors"
                                      />
                                      <button 
                                         onClick={(e) => sendQuickReply(notif, e)}

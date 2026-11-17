@@ -1142,7 +1142,7 @@ const Messages = () => {
                  </div>
                  
                  {/* Chat Messages */}
-                 <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-5 md:p-6 space-y-4 bg-transparent custom-scrollbar relative z-10">
+                 <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-3 sm:p-5 md:p-6 space-y-4 bg-transparent custom-scrollbar relative z-10">
                    <div className="text-center text-xs font-bold text-gray-400 my-4 tracking-widest uppercase">
                      Encrypted Session Started
                    </div>
@@ -1151,7 +1151,7 @@ const Messages = () => {
                        const isMine = msg.senderId === 'ME' || msg.isMine || false;
                        const orderInfo = parseOrderInquiry(msg, orderCache);
                        return (
-                          <div key={msg.id || idx} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+                          <div key={msg.id || idx} className={`flex w-full min-w-0 ${isMine ? 'justify-end' : 'justify-start'}`}>
                             <div 
                                onContextMenu={(e) => {
                                   e.preventDefault();
@@ -1162,7 +1162,7 @@ const Messages = () => {
                                   orderInfo 
                                     ? 'w-full max-w-[94%] sm:max-w-[85%] md:max-w-[75%]' 
                                     : 'max-w-[85%] sm:max-w-[80%]'
-                               } overflow-hidden relative group cursor-context-menu ${
+                               } overflow-hidden min-w-0 relative group cursor-context-menu ${
                                isMine 
                                  ? 'neu-button-primary text-white font-bold rounded-tr-sm' 
                                  : 'neu-card text-[var(--text-main)] font-bold rounded-tl-sm'
@@ -1207,7 +1207,7 @@ const Messages = () => {
                                     const orderLink = user?.role === 'SELLER' ? '/seller/orders' : `/buyer/orders/${orderId}`;
 
                                     return (
-                                       <div className="flex flex-col gap-2.5 w-full max-w-full overflow-hidden">
+                                       <div className="flex flex-col gap-2.5 w-full max-w-full min-w-0 overflow-hidden">
                                          {/* Header */}
                                          <div className="flex items-center justify-between gap-2 pb-2 border-b border-white/10 dark:border-white/10">
                                            <div className="flex items-center gap-1.5 min-w-0">
@@ -1238,7 +1238,7 @@ const Messages = () => {
                                          </div>
 
                                          {/* Product Preview Card */}
-                                         <div className={`flex items-center gap-2.5 sm:gap-3 p-2 sm:p-2.5 rounded-2xl w-full max-w-full overflow-hidden ${
+                                         <div className={`flex items-center gap-2.5 sm:gap-3 p-2 sm:p-2.5 rounded-2xl w-full max-w-full min-w-0 overflow-hidden ${
                                            isMine 
                                              ? 'bg-white/10 border border-white/20' 
                                              : 'bg-black/20 dark:bg-white/5 border border-black/10 dark:border-white/10'
@@ -1266,7 +1266,7 @@ const Messages = () => {
                                            
                                            <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5 overflow-hidden">
                                              <div className="min-w-0">
-                                               <h4 className={`text-xs sm:text-sm font-bold line-clamp-2 leading-snug break-words ${isMine ? 'text-white' : 'text-[var(--text-main)]'}`} title={productTitle}>
+                                               <h4 className={`text-xs sm:text-sm font-bold line-clamp-1 truncate leading-snug break-all ${isMine ? 'text-white' : 'text-[var(--text-main)]'}`} title={productTitle}>
                                                  {productTitle}
                                                </h4>
                                                <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -1285,7 +1285,7 @@ const Messages = () => {
                                                <Link 
                                                  to={orderLink}
                                                  onClick={(e) => e.stopPropagation()}
-                                                 className={`inline-flex items-center gap-1 text-[11px] font-bold mt-1.5 transition-colors group/link truncate ${
+                                                 className={`inline-flex items-center gap-1 text-[11px] font-bold mt-1.5 transition-colors group/link max-w-full truncate ${
                                                    isMine ? 'text-white underline hover:text-white/80' : 'text-sky-500 hover:text-sky-400'
                                                  }`}
                                                >
@@ -1298,7 +1298,7 @@ const Messages = () => {
 
                                          {/* Inquiry Message Text */}
                                          {inquiryText ? (
-                                           <div className={`p-2.5 rounded-xl text-xs sm:text-sm font-medium leading-relaxed break-words ${
+                                           <div className={`p-2.5 rounded-xl text-xs sm:text-sm font-medium leading-relaxed break-words w-full max-w-full min-w-0 overflow-hidden ${
                                              isMine 
                                                ? 'bg-white/10 text-white' 
                                                : 'bg-black/20 dark:bg-black/40 text-[var(--text-main)] border border-white/5'
