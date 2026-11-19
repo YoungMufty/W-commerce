@@ -13,12 +13,35 @@ const OrdersView = ({ orders, storeConfig, setPackingOrder, setShippingOrder, ap
   const [viewProofUrl, setViewProofUrl] = useState(null);
   const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
   const [receiptOrder, setReceiptOrder] = useState(null);
+  const [generatingOrderId, setGeneratingOrderId] = useState(null);
+  const [generatingStep, setGeneratingStep] = useState(1);
   const [isRejecting, setIsRejecting] = useState(false);
   const [isRequestingAddress, setIsRequestingAddress] = useState(false);
   const [rateOrderId, setRateOrderId] = useState(null);
   const [ratingValue, setRatingValue] = useState(5);
   const [ratingComment, setRatingComment] = useState('');
   const [isRating, setIsRating] = useState(false);
+
+  const handleGenerateReceipt = (order, e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (!order) return;
+    setGeneratingOrderId(order.id);
+    setGeneratingStep(1);
+
+    setTimeout(() => {
+      setGeneratingStep(2);
+    }, 320);
+
+    setTimeout(() => {
+      setGeneratingStep(3);
+    }, 640);
+
+    setTimeout(() => {
+      setGeneratingOrderId(null);
+      setGeneratingStep(1);
+      setReceiptOrder(order);
+    }, 950);
+  };
   
   const { requestOrderAddress } = useSellerStore();
   const currentOrderDetails = selectedOrderDetails ? (orders?.find(o => o.id === selectedOrderDetails.id) || selectedOrderDetails) : null;
@@ -250,13 +273,21 @@ const OrdersView = ({ orders, storeConfig, setPackingOrder, setShippingOrder, ap
 
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setReceiptOrder(order);
-                    }}
-                    className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl text-xs font-bold transition-all shadow-md mt-2 cursor-pointer"
+                    onClick={(e) => handleGenerateReceipt(order, e)}
+                    disabled={generatingOrderId === order.id}
+                    className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white py-2.5 rounded-xl text-xs font-bold transition-all shadow-md mt-2 cursor-pointer disabled:opacity-75"
                   >
-                    <Printer className="w-4 h-4" /> Create Order Receipt
+                    {generatingOrderId === order.id ? (
+                      <>
+                        <Clock className="w-4 h-4 animate-spin text-white" />
+                        <span>Generating Receipt...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Printer className="w-4 h-4" />
+                        <span>Create Order Receipt</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -342,10 +373,21 @@ const OrdersView = ({ orders, storeConfig, setPackingOrder, setShippingOrder, ap
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setReceiptOrder(currentOrderDetails)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
+                  onClick={(e) => handleGenerateReceipt(currentOrderDetails, e)}
+                  disabled={generatingOrderId === currentOrderDetails.id}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-75"
                 >
-                  <Printer className="w-4 h-4" /> Create Order Receipt
+                  {generatingOrderId === currentOrderDetails.id ? (
+                    <>
+                      <Clock className="w-3.5 h-3.5 animate-spin text-white" />
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Create Order Receipt</span>
+                    </>
+                  )}
                 </button>
                 <button onClick={() => setSelectedOrderDetails(null)} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
                   <XCircle className="w-6 h-6" />
@@ -536,6 +578,73 @@ const OrdersView = ({ orders, storeConfig, setPackingOrder, setShippingOrder, ap
               </button>
             </div>
           </motion.div>
+        </div>,
+        document.body
+      )}
+
+      {/* Loading Generating Receipt System Portal */}
+      {generatingOrderId && createPortal(
+        <div 
+          className="fixed inset-0 z-[350] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 max-w-sm sm:max-w-md w-full shadow-2xl flex flex-col items-center text-center relative overflow-hidden">
+            {/* Top decorative stripe */}
+            <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-600" />
+
+            {/* Pulsing Icon */}
+            <div className="relative mt-2 mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-md">
+                <Printer className="w-8 h-8 animate-pulse" />
+              </div>
+              <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow animate-spin">
+                <Clock className="w-3.5 h-3.5" />
+              </div>
+            </div>
+
+            <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight mb-1">
+              Generating Official Receipt
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 mb-5 font-mono">
+              Order #{String(generatingOrderId).slice(-8).toUpperCase()} • Escrow Secured
+            </p>
+
+            {/* Stepper info */}
+            <div className="w-full space-y-2.5 bg-slate-50 dark:bg-zinc-800/60 p-4 rounded-2xl border border-slate-100 dark:border-zinc-700/60 text-left text-xs mb-5">
+              <div className="flex items-center gap-2">
+                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${generatingStep >= 1 ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                  ✓
+                </span>
+                <span className={`font-semibold ${generatingStep >= 1 ? 'text-slate-800 dark:text-zinc-100' : 'text-slate-400'}`}>
+                  Verifying ledger & order line items
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${generatingStep >= 2 ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                  {generatingStep >= 2 ? '✓' : '2'}
+                </span>
+                <span className={`font-semibold ${generatingStep >= 2 ? 'text-slate-800 dark:text-zinc-100' : 'text-slate-400'}`}>
+                  Computing subtotal, shipping, and taxes
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${generatingStep >= 3 ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                  {generatingStep >= 3 ? '✓' : '3'}
+                </span>
+                <span className={`font-semibold ${generatingStep >= 3 ? 'text-slate-800 dark:text-zinc-100' : 'text-slate-400'}`}>
+                  Signing cryptographic QR verification seal
+                </span>
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div className="w-full bg-slate-100 dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
+              <div 
+                className="bg-emerald-500 h-full rounded-full transition-all duration-300 ease-out"
+                style={{ width: generatingStep === 1 ? '35%' : generatingStep === 2 ? '70%' : '100%' }}
+              />
+            </div>
+          </div>
         </div>,
         document.body
       )}

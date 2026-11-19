@@ -3,15 +3,18 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  const envDir = path.resolve(process.cwd(), '../');
-  const env = loadEnv(mode, envDir, '');
+  const projectRoot = path.resolve(__dirname, '..');
+  const env = loadEnv(mode, projectRoot, '');
   const isDev = mode === 'development'
 
   return {
-    envDir: '../',
+    envDir: projectRoot,
     plugins: [
       react(),
       tailwindcss(),
@@ -73,10 +76,10 @@ export default defineConfig(({ mode }) => {
     ],
     resolve: {
       alias: {
-        "@": path.resolve(import.meta.dirname, "./src"),
-        "react": path.resolve(import.meta.dirname, "../node_modules/react"),
-        "react-dom": path.resolve(import.meta.dirname, "../node_modules/react-dom"),
-        "react-router-dom": path.resolve(import.meta.dirname, "../node_modules/react-router-dom"),
+        "@": path.resolve(__dirname, "./src"),
+        "react": path.resolve(__dirname, "../node_modules/react"),
+        "react-dom": path.resolve(__dirname, "../node_modules/react-dom"),
+        "react-router-dom": path.resolve(__dirname, "../node_modules/react-router-dom"),
       },
       dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime', 'react-router', 'react-router-dom']
     },

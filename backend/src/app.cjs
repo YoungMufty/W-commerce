@@ -49,6 +49,7 @@ const globalStartup = global.__GLOBALX_STARTUP || (global.__GLOBALX_STARTUP = {
 const { cspNonce, buildCspHeader } = require('./middleware/cspNonce');
 const helmet = require('helmet');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const compression = require('compression');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
@@ -641,6 +642,16 @@ app.use('/api', (req, res, next) => {
         res.setHeader('Sunset', new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000).toUTCString()); // ~6 months
     }
     next();
+});
+
+app.get(['/api', '/api/v1'], (req, res) => {
+    res.json({
+        success: true,
+        name: 'W-Commerce API',
+        version: 'v1',
+        status: 'online',
+        serverless: Boolean(process.env.VERCEL)
+    });
 });
 
 app.use(['/api/auth', '/api/v1/auth'], authRoutes);

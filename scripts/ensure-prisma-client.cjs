@@ -14,6 +14,7 @@ const root = path.resolve(__dirname, '..');
 // Load environment variables if not already set
 function loadEnv() {
   const envPaths = [
+    path.join(root, '.env.production'),
     path.join(root, '.env'),
     path.join(root, 'backend/.env'),
     path.join(root, '.env.local')
@@ -43,7 +44,7 @@ function loadEnv() {
 
 loadEnv();
 
-const dbUrl = process.env.DATABASE_URL || '';
+const dbUrl = process.env.DATABASE_URL || process.env.SUPABASE_DATABASE_URL || process.env.DIRECT_URL || '';
 const isPostgres = dbUrl.startsWith('postgres://') || dbUrl.startsWith('postgresql://') || Boolean(process.env.VERCEL);
 const targetProvider = isPostgres ? 'postgresql' : 'sqlite';
 const targetSchema = isPostgres

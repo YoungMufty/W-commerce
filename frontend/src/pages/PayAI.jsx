@@ -551,6 +551,14 @@ function MarkdownContent({ content, onAction, isSending = false }) {
           );
         }
 
+        if (inner.includes('[') && inner.includes('](')) {
+          return (
+            <strong key={pIdx} className="font-bold text-slate-900 dark:text-white">
+              {renderInline(inner)}
+            </strong>
+          );
+        }
+
         return (
           <strong key={pIdx} className="font-bold text-slate-900 dark:text-white">
             {inner}
@@ -560,9 +568,10 @@ function MarkdownContent({ content, onAction, isSending = false }) {
 
       // Italic: *text*
       if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
+        const inner = part.slice(1, -1);
         return (
           <em key={pIdx} className="italic text-slate-700 dark:text-zinc-300">
-            {part.slice(1, -1)}
+            {inner.includes('[') && inner.includes('](') ? renderInline(inner) : inner}
           </em>
         );
       }

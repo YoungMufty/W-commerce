@@ -65,7 +65,7 @@ function check(key, name, validator) {
 
 function isPlaceholder(val) {
   if (!val) return true;
-  return /replace|placeholder|your_|changeme|xxx|<.*>|todo|dummy/i.test(val);
+  return /replace|placeholder|your_|changeme|\bxxx+\b|<.*>|\btodo\b|\bdummy\b/i.test(val);
 }
 
 // 1. Core Server Configuration
@@ -119,12 +119,13 @@ check('FILE_ENCRYPTION_KEY', 'File Encryption Key', (v) => {
 
 // 3. Database & Caching
 check('DATABASE_URL', 'PostgreSQL Database Connection', (v) => {
-  if (!v) return 'Missing DATABASE_URL';
-  if (v.startsWith('file:') || v.endsWith('.db') || v.endsWith('.sqlite')) {
+  const effectiveUrl = v || (env.SUPABASE_DATABASE_URL || '').trim();
+  if (!effectiveUrl) return 'Missing DATABASE_URL (or SUPABASE_DATABASE_URL)';
+  if (effectiveUrl.startsWith('file:') || effectiveUrl.endsWith('.db') || effectiveUrl.endsWith('.sqlite')) {
     return 'SQLite database is NOT permitted in production. Must use PostgreSQL (postgresql://...).';
   }
-  if (v.startsWith('postgresql://') || v.startsWith('postgres://')) {
-    if (isPlaceholder(v)) return 'Contains placeholder credentials (e.g. USER:PASSWORD@DB_HOST).';
+  if (effectiveUrl.startsWith('postgresql://') || effectiveUrl.startsWith('postgres://')) {
+    if (isPlaceholder(effectiveUrl)) return 'Contains placeholder credentials (e.g. USER:PASSWORD@DB_HOST).';
     return true;
   }
   return 'Must be a valid PostgreSQL connection string starting with postgresql://';
@@ -147,9 +148,10 @@ check('REDIS_URL', 'Redis Session & Pub/Sub Store', (v) => {
 const stripeSecret = env.STRIPE_SECRET_KEY || '';
 const paystackSecret = env.PAYSTACK_SECRET_KEY || '';
 const paypalClient = env.PAYPAL_CLIENT_ID || '';
+const monnifyKey = env.MONNIFY_API_KEY || '';
 
-if (!stripeSecret && !paystackSecret && !paypalClient) {
-  warnings.push('PAYMENTS: No payment gateways (Stripe, Paystack, PayPal) are configured. All checkouts will fail.');
+if (!stripeSecret && !paystackSecret && !paypalClient && !monnifyKey) {
+  warnings.push('PAYMENTS: No payment gateways (Stripe, Paystack, Monnify, PayPal) are configured. All checkouts will fail.');
 } else {
   if (stripeSecret) {
     if (isPlaceholder(stripeSecret)) {

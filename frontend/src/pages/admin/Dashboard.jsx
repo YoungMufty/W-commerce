@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { apiClient as axios } from '../../utils/apiClient';
 import toast from 'react-hot-toast';
 import { useSocket } from '../../hooks/useSocket';
-import NotificationBell from '../../components/shared/NotificationBell';
 import { 
   Activity, ShieldCheck, Zap, UserCheck, Users, AlertTriangle, 
   Package, Globe, DollarSign, BarChart2, Store, 
@@ -102,21 +101,16 @@ const AdminDashboard = () => {
 
   const tabs = [
     { id: 'overview', label: 'Master Overview', icon: Activity },
-    { id: 'escrow', label: 'Escrow Vault', icon: ShieldCheck },
-    { id: 'live_tx', label: 'Live Transactions', icon: Zap },
+    { id: 'analytics', label: 'Platform Analytics', icon: BarChart2 },
     { id: 'kyb', label: 'KYB Approvals', icon: Store },
     { id: 'kyc', label: 'KYC Approvals', icon: UserCheck },
-    { id: 'arbitration', label: 'Dispute Arbitration', icon: AlertTriangle },
-    { id: 'hub_logistics', label: 'Hub Logistics', icon: Package },
+    { id: 'escrow', label: 'Escrow Vault', icon: ShieldCheck },
+    { id: 'live_tx', label: 'Live Transactions', icon: Zap },
     { id: 'revenue', label: 'Fee Revenue', icon: DollarSign },
-    { id: 'analytics', label: 'Platform Analytics', icon: BarChart2 },
     { id: 'users', label: 'User Management', icon: Users },
     { id: 'merchants', label: 'Merchant Management', icon: Store },
-    { id: 'support', label: 'Payouts', icon: DollarSign },
-    { id: 'reviews', label: 'Review Moderation', icon: Eye },
-    { id: 'promo', label: 'Access Promos', icon: Megaphone },
-    { id: 'audit', label: 'Audit Logs', icon: FileText },
-    { id: 'system_stories', label: 'System Stories', icon: BookOpen },
+    { id: 'support', label: 'Payout Requests', icon: DollarSign },
+    { id: 'arbitration', label: 'Dispute Arbitration', icon: AlertTriangle },
   ];
 
   const fetchTabData = useCallback(async (tab) => {
@@ -586,13 +580,6 @@ const AdminDashboard = () => {
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                   Live Network Telemetry
                 </span>
-                <button 
-                  onClick={() => fetchTabData('analytics')} 
-                  className="p-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-[var(--accent-gray)] transition-colors text-[var(--text-muted)] hover:text-white"
-                  title="Refresh Data"
-                >
-                  <RefreshCcw size={16} />
-                </button>
               </div>
             </div>
 
@@ -663,7 +650,7 @@ const AdminDashboard = () => {
                   </p>
                 </div>
                 
-                {/* Search Bar & Action */}
+                {/* Search Bar */}
                 <div className="flex items-center gap-3">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={15} />
@@ -675,14 +662,6 @@ const AdminDashboard = () => {
                       className="pl-9 pr-3 py-1.5 text-xs bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl text-white placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-gray)] w-48 md:w-56"
                     />
                   </div>
-                  {filteredStores.length > 0 && (
-                    <button
-                      onClick={() => setExpandedStoreId(expandedStoreId ? null : filteredStores[0]?.id)}
-                      className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-[var(--accent-gray)] text-[var(--text-muted)] hover:text-white transition-colors"
-                    >
-                      {expandedStoreId ? 'Collapse All' : 'Expand Top'}
-                    </button>
-                  )}
                 </div>
               </div>
 
@@ -803,25 +782,9 @@ const AdminDashboard = () => {
                               </div>
                             </div>
 
-                            {/* Store Meta & Action Strip */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-white/5 text-xs text-[var(--text-muted)]">
-                              <div>
-                                Store ID: <span className="font-mono text-gray-400">{store.id}</span> &bull; Seller ID: <span className="font-mono text-gray-400">{store.sellerId}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <button 
-                                  onClick={() => setActiveTab('merchants')}
-                                  className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white font-medium transition-colors border border-white/10"
-                                >
-                                  View Merchant Profile &rarr;
-                                </button>
-                                <button 
-                                  onClick={() => setActiveTab('support')}
-                                  className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-medium transition-colors border border-amber-500/20"
-                                >
-                                  Payout Requests &rarr;
-                                </button>
-                              </div>
+                            {/* Store Meta */}
+                            <div className="pt-3 border-t border-white/5 text-xs text-[var(--text-muted)]">
+                              Store ID: <span className="font-mono text-gray-400">{store.id}</span> &bull; Seller ID: <span className="font-mono text-gray-400">{store.sellerId}</span>
                             </div>
                           </div>
                         )}
@@ -889,11 +852,8 @@ const AdminDashboard = () => {
                   </div>
                 </div>
 
-                <div className="pt-4 mt-6 border-t border-[var(--border-color)] flex items-center justify-between text-xs text-[var(--text-muted)]">
+                <div className="pt-4 mt-6 border-t border-[var(--border-color)] text-xs text-[var(--text-muted)]">
                   <span>RevenueCat & Paystack billing active</span>
-                  <button onClick={() => setActiveTab('merchants')} className="text-blue-400 hover:underline font-semibold">
-                    Manage Plans &rarr;
-                  </button>
                 </div>
               </div>
 
@@ -946,11 +906,8 @@ const AdminDashboard = () => {
                   </div>
                 </div>
 
-                <div className="pt-4 mt-6 border-t border-[var(--border-color)] flex items-center justify-between text-xs text-[var(--text-muted)]">
+                <div className="pt-4 mt-6 border-t border-[var(--border-color)] text-xs text-[var(--text-muted)]">
                   <span>Ad boost rate: ₦2,500 / 30 days</span>
-                  <button onClick={() => setActiveTab('promo')} className="text-amber-400 hover:underline font-semibold">
-                    Manage Campaigns &rarr;
-                  </button>
                 </div>
               </div>
             </div>
@@ -1146,7 +1103,6 @@ const AdminDashboard = () => {
         <div className="md:hidden flex items-center justify-between mb-4 premium-glass p-4 rounded-xl border border-[var(--border-color)] shadow-lg relative z-50">
           <h2 className="font-bold text-lg">Admin Menu</h2>
           <div className="flex items-center gap-2">
-            <NotificationBell />
             <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-color)] hover:border-[var(--accent-gray)] transition-colors">
               <Menu size={20} className="text-[var(--accent-gray)]" />
             </button>
@@ -1172,7 +1128,6 @@ const AdminDashboard = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <NotificationBell />
                   <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-2 rounded-full bg-[var(--bg-tertiary)] hover:bg-[var(--accent-gray)] hover:text-black transition-colors">
                     <X size={18} />
                   </button>

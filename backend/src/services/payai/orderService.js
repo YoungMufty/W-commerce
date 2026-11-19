@@ -2538,13 +2538,19 @@ class PayAIOrderService {
     } catch (_) {}
 
     // 5. Build Empathetic & Clear Explanation
-    const itemsListStr = affectedItems.map(it => `• **${it.title || 'Marketplace Item'}** (Qty: ${it.quantity || 1}, ${formatMoney(Number(it.price || 0) * Number(it.quantity || 1))})`).join('\n');
+    const itemsListStr = affectedItems && affectedItems.length > 0
+      ? affectedItems.map(it => `• **${it.title || 'Marketplace Item'}** (Qty: ${it.quantity || 1}, ${formatMoney(Number(it.price || 0) * Number(it.quantity || 1))})`).join('\n')
+      : '• **Order Item** (General package contents)';
 
     let deliveryStatusText = '';
     if (isDelivered) {
+      const parsedDeliveredDate = deliveredAt ? new Date(deliveredAt) : null;
+      const validDeliveredDateStr = (parsedDeliveredDate && !isNaN(parsedDeliveredDate.getTime()))
+        ? parsedDeliveredDate.toLocaleDateString()
+        : 'recent delivery';
       deliveryStatusText = isWithinReturnWindow
-        ? `Delivered on ${new Date(deliveredAt).toLocaleDateString()} (**${daysRemainingInWindow} days remaining** in seller's ${returnDays}-day return window)`
-        : `Delivered on ${new Date(deliveredAt).toLocaleDateString()} (${daysSinceDelivery} days ago — **outside standard ${returnDays}-day return window**, but Escrow mediation applies)`;
+        ? `Delivered on ${validDeliveredDateStr} (**${daysRemainingInWindow} days remaining** in seller's ${returnDays}-day return window)`
+        : `Delivered on ${validDeliveredDateStr} (${daysSinceDelivery} days ago — **outside standard ${returnDays}-day return window**, but Escrow mediation applies)`;
     } else {
       deliveryStatusText = `Currently in transit with ${order.carrierName || 'Courier'} (Tracking: ${order.trackingNumber || 'Active'})`;
     }
@@ -2560,9 +2566,9 @@ class PayAIOrderService {
       `**Affected Items:**\n${itemsListStr}\n\n` +
       `### ⚖️ Your Available Resolution Options:\n` +
       remedies.map((rem, idx) =>
-        `${idx + 1}. **${rem.title}:** ${rem.description} *(Action: [${rem.badge}](prompt:${rem.promptAction}))*`
+        `${idx + 1}. **${rem.title}:** ${rem.description}\n   [${rem.badge}](prompt:${rem.promptAction})`
       ).join('\n\n') +
-      `\n\n💡 **Recommended Action:** Based on your report, I recommend **${remedies.find(r => r.id === primaryRemedy)?.title || 'Replacement'}**! You can tap any button below to proceed instantly, or escalate to a live human mediator: [🛡️ Escalate to Escrow Admin](prompt:Escalate dispute for order #${order.orderNumber} to human mediator).`;
+      `\n\n💡 **Recommended Action:** Based on your report, I recommend **${remedies.find(r => r.id === primaryRemedy)?.title || 'Replacement'}**! You can tap any button to proceed instantly, or escalate to a live human mediator:\n\n[🛡️ Escalate to Escrow Admin](prompt:Escalate dispute for order #${order.orderNumber} to human mediator)`;
 
     return {
       success: true,

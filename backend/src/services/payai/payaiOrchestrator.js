@@ -3601,13 +3601,15 @@ class PayAIOrchestrator {
 
     const isMessageSellerIntent =
       contextData?.actionType === 'MESSAGE_SELLER' ||
-      /\b(?:(?:send\s+(?:a\s+)?message|message|contact|reach\s+out|write|inquire|ask|tell)\s+(?:to\s+)?(?:the\s+)?(?:seller|merchant|vendor|store)\b)/i.test(lower) ||
+      /\b(?:(?:send\s+(?:a\s+)?message|message|contact|reach\s+out|write|inquire|ask|tell|report|send\s+report)\s+(?:.*?\b)?(?:to\s+)?(?:the\s+)?(?:seller|merchant|vendor|store)\b)/i.test(lower) ||
+      /\b(?:delivery\s+report|dispute\s+report|issue\s+report)\s+(?:to\s+)?(?:the\s+)?(?:seller|merchant|vendor|store)\b/i.test(lower) ||
+      /\b(?:message\s+(?:and\s+)?(?:delivery\s+)?report\s+(?:to\s+)?(?:the\s+)?(?:seller|merchant|vendor|store))\b/i.test(lower) ||
       /\b(?:seller|merchant|vendor)\s+(?:message|inquiry|contact|chat)\b/i.test(lower) ||
-      ((lower.includes('delivery update') || lower.includes('shipping update')) && (lower.includes('seller') || lower.includes('merchant')));
+      ((lower.includes('delivery update') || lower.includes('shipping update') || lower.includes('delivery report')) && (lower.includes('seller') || lower.includes('merchant')));
 
     if (isMessageSellerIntent) {
       let customInquiry = text;
-      customInquiry = customInquiry.replace(/^(?:please\s+)?(?:send\s+(?:a\s+)?message\s+(?:to\s+)?(?:the\s+)?(?:seller|merchant|vendor)\s+(?:of|for|about|regarding)\s+(?:order\s+)?#?[A-Za-z0-9-_]+|message\s+(?:the\s+)?(?:seller|merchant|vendor)\s+(?:of|for|about|regarding)\s+(?:order\s+)?#?[A-Za-z0-9-_]+|contact\s+(?:the\s+)?(?:seller|merchant|vendor)\s+(?:of|for|about|regarding)\s+(?:order\s+)?#?[A-Za-z0-9-_]+)\s*(?::|-|,)?\s*/i, '').trim();
+      customInquiry = customInquiry.replace(/^(?:please\s+)?(?:send\s+(?:a\s+)?message(?:\s+and\s+(?:delivery\s+)?report)?|message(?:\s+and\s+(?:delivery\s+)?report)?|contact|reach\s+out(?:\s+to)?|send\s+(?:delivery\s+)?report)\s+(?:to\s+)?(?:the\s+)?(?:seller|merchant|vendor|store)\s*(?:that|regarding|about|for|of)?\s*(?:order\s*#?[A-Za-z0-9-_]+)?\s*(?:that\s+)?(?::|-|,)?\s*/i, '').trim();
 
       if (/^requesting\s+/i.test(customInquiry)) {
         customInquiry = customInquiry.replace(/^requesting\s+/i, 'Customer is requesting ');
@@ -3615,12 +3617,14 @@ class PayAIOrchestrator {
         customInquiry = 'Customer is requesting an estimated delivery update and current fulfillment status.';
       }
 
+      const inquiryType = /wrong\s+item|damaged|broken|refund|replace|dispute|report/i.test(text) ? 'DISPUTE_DELIVERY_REPORT' : 'DELIVERY_UPDATE';
+
       return {
         toolName: 'message_seller',
         toolArgs: {
           orderId: extractedOrderId,
           message: customInquiry,
-          inquiryType: 'DELIVERY_UPDATE'
+          inquiryType
         }
       };
     }

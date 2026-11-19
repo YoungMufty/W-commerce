@@ -38,11 +38,12 @@ function build() {
 const next = build();
 if (process.argv.includes('--check')) {
   const cur = fs.existsSync(out) ? fs.readFileSync(out, 'utf8').replace(/\r\n/g, '\n') : '';
-  if (cur !== next) {
-    console.error('database/prisma/postgres/schema.prisma is out of date. Run: node scripts/sync-postgres-schema.cjs');
+  const curBackend = fs.existsSync(backendOut) ? fs.readFileSync(backendOut, 'utf8').replace(/\r\n/g, '\n') : '';
+  if (cur !== next || curBackend !== next) {
+    console.error('PostgreSQL Prisma schemas (database/prisma/postgres and backend/prisma) are out of date. Run: node scripts/sync-postgres-schema.cjs');
     process.exit(1);
   }
-  console.log('postgres schema is in sync');
+  console.log('postgres schemas are in sync');
 } else {
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(out, next, 'utf8');
