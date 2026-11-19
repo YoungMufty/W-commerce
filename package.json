@@ -7,12 +7,14 @@
   ],
   "scripts": {
     "install:all": "npm install",
-    "postinstall": "prisma generate --schema=database/prisma/postgres/schema.prisma || prisma generate --schema=database/prisma/schema.prisma",
+    "postinstall": "node scripts/ensure-prisma-client.cjs",
     "dev:frontend": "npm run dev --workspace=frontend",
-    "dev:backend": "npm run dev --workspace=backend",
+    "dev:backend": "node scripts/ensure-prisma-client.cjs && npm run dev --workspace=backend",
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
     "build": "npm run db:generate:prod && npm run build:production",
     "build:production": "npm run build --workspace=frontend",
+    "db:ensure": "node scripts/ensure-prisma-client.cjs",
+    "db:generate:dev": "prisma generate --schema=database/prisma/schema.prisma",
     "db:sync-postgres-schema": "node scripts/sync-postgres-schema.cjs",
     "db:generate:prod": "node scripts/sync-postgres-schema.cjs && prisma generate --schema=database/prisma/postgres/schema.prisma",
     "prisma:generate": "prisma generate --schema=database/prisma/postgres/schema.prisma",
@@ -29,6 +31,7 @@
     "@prisma/client": "^5.22.0"
   },
   "devDependencies": {
-    "concurrently": "^10.0.5"
+    "concurrently": "^10.0.5",
+    "prisma": "^5.22.0"
   }
 }
