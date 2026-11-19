@@ -28,7 +28,7 @@ const RotatingText = () => {
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: -10, opacity: 0 }}
         transition={{ duration: 0.3 }}
-        style={{ display: 'inline-block', color: '#ffeb3b', fontWeight: '900', marginLeft: '0.5rem' }}
+        className="inline-block text-[#ffeb3b] font-black ml-1.5 text-[11px] sm:text-xs truncate max-w-[110px] sm:max-w-none"
       >
         {words[index]}
       </motion.span>
@@ -38,7 +38,7 @@ const RotatingText = () => {
 
 const FloatingBalloons = ({ count = 7 }) => {
   return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden z-[45]">
+    <div className="absolute inset-0 pointer-events-none overflow-hidden z-10">
       {[...Array(count)].map((_, i) => {
         const left = `${10 + Math.random() * 80}%`;
         const delay = Math.random() * 2;
@@ -49,7 +49,7 @@ const FloatingBalloons = ({ count = 7 }) => {
         return (
           <motion.div
             key={i}
-            initial={{ y: '110vh', x: 0, opacity: 0.95 }}
+            initial={{ y: '110vh', x: 0, opacity: 0.7 }}
             animate={{ 
               y: '-20vh', 
               x: [0, Math.random() > 0.5 ? 40 : -40, Math.random() > 0.5 ? -20 : 20, 0],
@@ -60,21 +60,21 @@ const FloatingBalloons = ({ count = 7 }) => {
               repeat: Infinity,
               ease: "easeInOut"
             }}
-            className="absolute bottom-0"
+            className="absolute bottom-0 pointer-events-none select-none"
             style={{ left }}
           >
-            <div className="relative flex flex-col items-center drop-shadow-xl">
+            <div className="relative flex flex-col items-center drop-shadow-sm pointer-events-none select-none opacity-60">
               <div 
-                className="w-12 h-14 rounded-[50%] shadow-inner"
-                style={{ backgroundColor: color, border: '1px solid rgba(255,255,255,0.4)' }}
+                className="w-10 h-12 rounded-[50%] shadow-inner pointer-events-none"
+                style={{ backgroundColor: color, border: '1px solid rgba(255,255,255,0.3)' }}
               >
-                <div className="absolute top-2 left-2 w-3 h-3 bg-white/40 rounded-full blur-[1px]" />
+                <div className="absolute top-2 left-2 w-2.5 h-2.5 bg-white/40 rounded-full blur-[1px]" />
               </div>
               <div 
-                className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[6px]"
+                className="w-0 h-0 border-l-[3px] border-l-transparent border-r-[3px] border-r-transparent border-b-[5px]"
                 style={{ borderBottomColor: color, marginTop: '-2px' }}
               />
-              <div className="w-[1px] h-12 bg-white/50 shadow-sm" />
+              <div className="w-[1px] h-10 bg-white/40 shadow-sm" />
             </div>
           </motion.div>
         );
@@ -433,16 +433,17 @@ const FullscreenFeedCard = ({ post, isActive, onAddToCart, onClose, asMainFeed }
   let priceAreaStyle = "bg-black/75 border border-white/20 backdrop-blur-xl text-white shadow-2xl";
   let buyButtonClass = "w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[15px] py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(16,185,129,0.4)] border-none transition-all";
 
-  if (post.promoType === 'FLASH_DEAL') {
+  if (post.promoType === 'FLASH_DEAL' || (post.isFlashSale && !post.promoType)) {
     containerStyle = "relative w-full h-full bg-[#1a1a1a] select-none overflow-hidden border-[3px] border-[#ff1744] shadow-[inset_0_0_20px_rgba(255,23,68,0.3)]";
     promoBadge = (
       <motion.div 
         initial={{ y: -50, opacity: 0, rotate: -10 }} 
         animate={{ y: 0, opacity: 1, rotate: 0 }} 
         transition={{ type: "spring", bounce: 0.5, delay: 0.2 }}
-        className="absolute top-4 left-4 z-50 bg-[#ff1744]/10 text-[#ff1744] px-4 py-2 rounded-xl font-black flex items-center gap-2 text-sm shadow-[0_0_15px_rgba(255,23,68,0.5)] border border-[#ff1744]"
+        className={`absolute ${asMainFeed ? 'top-[84px] sm:top-[92px]' : 'top-4 sm:top-5'} left-3 sm:left-4 z-30 bg-[#ff1744]/15 backdrop-blur-md text-[#ff1744] px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl font-black flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm shadow-[0_0_15px_rgba(255,23,68,0.5)] border border-[#ff1744] pointer-events-none max-w-[calc(100%-140px)] sm:max-w-none`}
       >
-        <Timer size={18} className="pulse-anim" /> FLASH DEAL
+        <Timer size={16} className="pulse-anim shrink-0 text-[#ff1744]" />
+        <span className="shrink-0 tracking-wide">FLASH DEAL</span>
         <RotatingText />
       </motion.div>
     );
@@ -455,9 +456,10 @@ const FullscreenFeedCard = ({ post, isActive, onAddToCart, onClose, asMainFeed }
         initial={{ y: -50, opacity: 0, scale: 0.5 }} 
         animate={{ y: 0, opacity: 1, scale: 1 }} 
         transition={{ type: "spring", bounce: 0.5, delay: 0.2 }}
-        className="absolute top-4 left-4 z-50 bg-gradient-to-r from-[#ffd700] to-[#ff8c00] text-white px-4 py-2 rounded-xl font-black flex items-center gap-2 text-sm shadow-lg border border-[#ffd700]/50"
+        className={`absolute ${asMainFeed ? 'top-[84px] sm:top-[92px]' : 'top-4 sm:top-5'} left-3 sm:left-4 z-30 bg-gradient-to-r from-[#ffd700] to-[#ff8c00] text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl font-black flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm shadow-lg border border-[#ffd700]/50 backdrop-blur-md pointer-events-none max-w-[calc(100%-140px)] sm:max-w-none`}
       >
-        <PartyPopper size={18} /> FESTIVAL SPECIAL
+        <PartyPopper size={16} className="shrink-0" />
+        <span className="tracking-wide">FESTIVAL SPECIAL</span>
       </motion.div>
     );
     priceAreaStyle = "bg-white/80 backdrop-blur-md border border-[#ffd700]";
@@ -469,9 +471,10 @@ const FullscreenFeedCard = ({ post, isActive, onAddToCart, onClose, asMainFeed }
         initial={{ x: -50, opacity: 0 }} 
         animate={{ x: 0, opacity: 1 }} 
         transition={{ type: "spring", bounce: 0.5, delay: 0.2 }}
-        className="absolute top-4 left-4 z-50 bg-white/40 backdrop-blur-md text-[#4a148c] px-4 py-2 rounded-xl font-black flex items-center gap-2 text-sm shadow-lg border border-white/50"
+        className={`absolute ${asMainFeed ? 'top-[84px] sm:top-[92px]' : 'top-4 sm:top-5'} left-3 sm:left-4 z-30 bg-white/40 backdrop-blur-md text-[#4a148c] px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl font-black flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm shadow-lg border border-white/50 pointer-events-none max-w-[calc(100%-140px)] sm:max-w-none`}
       >
-        <Sunset size={18} /> WEEKEND VIBES
+        <Sunset size={16} className="shrink-0" />
+        <span className="tracking-wide">WEEKEND VIBES</span>
       </motion.div>
     );
     priceAreaStyle = "bg-white/40 backdrop-blur-md border border-white/60";
@@ -546,18 +549,18 @@ const FullscreenFeedCard = ({ post, isActive, onAddToCart, onClose, asMainFeed }
       {(audioUrl || isCurrentVideo) && (
         <button
           onClick={handleToggleSound}
-          className={`absolute top-4 ${asMainFeed ? 'right-4' : 'right-16'} z-50 px-3.5 py-1.5 backdrop-blur-xl rounded-full flex items-center gap-1.5 text-white text-xs font-bold transition-all pointer-events-auto shadow-lg border border-white/20 ${isMuted ? 'bg-red-500/80 hover:bg-red-600' : 'bg-black/60 hover:bg-black/80'}`}
+          className={`absolute ${asMainFeed ? 'top-[84px] sm:top-[92px] right-3 sm:right-4' : 'top-4 right-16'} z-30 px-3 sm:px-3.5 py-1.5 backdrop-blur-xl rounded-full flex items-center gap-1.5 text-white text-xs font-bold transition-all pointer-events-auto shadow-lg border border-white/20 ${isMuted ? 'bg-red-500/80 hover:bg-red-600' : 'bg-black/60 hover:bg-black/80'}`}
           title={isMuted ? 'Tap for sound' : 'Sound on'}
         >
           {isMuted ? (
             <>
               <VolumeX size={15} />
-              <span>Tap for sound</span>
+              <span className="hidden sm:inline">Tap for sound</span>
             </>
           ) : (
             <>
               <Volume2 size={15} className="text-emerald-400" />
-              <span>Sound on</span>
+              <span className="hidden sm:inline">Sound on</span>
             </>
           )}
         </button>
@@ -565,7 +568,7 @@ const FullscreenFeedCard = ({ post, isActive, onAddToCart, onClose, asMainFeed }
 
       {/* Right Action Bar */}
       {!post.isFlashSale && (
-        <div className="absolute right-12 bottom-48 md:bottom-32 z-20 flex flex-col items-center gap-5 pointer-events-none">
+        <div className="absolute right-12 bottom-48 md:bottom-32 z-30 flex flex-col items-center gap-5 pointer-events-none">
           <LikeButton liked={liked} count={likeCount} onLike={handleLike} />
           <ActionBtn icon={MessageCircle} label={post.comments} onClick={() => setShowComments(true)} />
           <ActionBtn icon={Share2} label="Share" onClick={handleShare} />
@@ -575,7 +578,7 @@ const FullscreenFeedCard = ({ post, isActive, onAddToCart, onClose, asMainFeed }
       )}
 
       {/* Bottom Info */}
-      <motion.div initial={{ y: 24, opacity: 0 }} animate={{ y: isActive ? 0 : 24, opacity: isActive ? 1 : 0 }} transition={{ duration: 0.5, delay: 0.15 }} className="absolute pb-28 md:pb-8 bottom-0 left-0 right-20 p-5 z-20 pointer-events-none">
+      <motion.div initial={{ y: 24, opacity: 0 }} animate={{ y: isActive ? 0 : 24, opacity: isActive ? 1 : 0 }} transition={{ duration: 0.5, delay: 0.15 }} className="absolute pb-28 md:pb-8 bottom-0 left-0 right-20 p-5 z-30 pointer-events-none">
 
         {/* TikTok-style music label + mute button */}
         {(audioUrl || isCurrentVideo) && (
@@ -657,8 +660,8 @@ const FullscreenFeedCard = ({ post, isActive, onAddToCart, onClose, asMainFeed }
         <p className="text-white text-[15px] font-medium leading-snug mb-5 pr-4 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">{post.text}</p>
         
         {basePrice > 0 && (
-          <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.35 }} className="flex items-center gap-2 sm:gap-3 pointer-events-auto mr-2">
-            <div className={`${priceAreaStyle} rounded-xl px-3 sm:px-4 py-3 flex items-center gap-1.5 shadow-2xl flex-shrink-0`}>
+          <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.35 }} className="flex items-center gap-2 sm:gap-3 pointer-events-auto mr-2 relative z-30">
+            <div className={`${priceAreaStyle} rounded-xl px-3 sm:px-4 py-3 flex items-center gap-1.5 shadow-2xl flex-shrink-0 select-none`}>
               <Flame size={16} className="text-orange-500 fill-orange-500 hidden sm:block animate-bounce" />
               <span className="text-white font-black text-[14px] sm:text-[16px] tracking-tight">₦{Number(finalPrice).toLocaleString()}</span>
               {hasDiscount && (
@@ -666,8 +669,8 @@ const FullscreenFeedCard = ({ post, isActive, onAddToCart, onClose, asMainFeed }
               )}
             </div>
             {post.isFlashSale ? (
-              <Link to={`/product/${targetProductId}`} className="flex-1 min-w-0">
-                <motion.button whileTap={{ scale: 0.94 }} className={`${buyButtonClass} text-[13px] sm:text-[15px] whitespace-nowrap overflow-hidden text-ellipsis flex items-center justify-center gap-1 sm:gap-2`}>
+              <Link to={`/product/${targetProductId}`} className="flex-1 min-w-0 relative z-30 pointer-events-auto">
+                <motion.button whileTap={{ scale: 0.94 }} className={`${buyButtonClass} text-[13px] sm:text-[15px] whitespace-nowrap overflow-hidden text-ellipsis flex items-center justify-center gap-1 sm:gap-2 cursor-pointer pointer-events-auto`}>
                   <span>View Deal</span>
                   <ArrowRight size={14} className="hidden sm:inline-block" />
                 </motion.button>
@@ -676,10 +679,10 @@ const FullscreenFeedCard = ({ post, isActive, onAddToCart, onClose, asMainFeed }
               <motion.button 
                 whileTap={{ scale: isOutOfStock ? 1 : 0.94 }} 
                 onClick={isOutOfStock ? null : handleCart} 
-                className={`flex-1 font-black text-[14px] sm:text-[15px] py-3.5 px-3 sm:px-4 rounded-xl flex items-center justify-center gap-1.5 sm:gap-2 shadow-2xl transition-all min-w-0 whitespace-nowrap overflow-hidden text-ellipsis ${
+                className={`flex-1 font-black text-[14px] sm:text-[15px] py-3.5 px-3 sm:px-4 rounded-xl flex items-center justify-center gap-1.5 sm:gap-2 shadow-2xl transition-all min-w-0 whitespace-nowrap overflow-hidden text-ellipsis relative z-30 pointer-events-auto ${
                   isOutOfStock 
                     ? 'bg-gray-700 text-white/50 cursor-not-allowed border border-gray-600' 
-                    : 'bg-emerald-500 hover:bg-emerald-600 text-white border border-emerald-400 shadow-[0_4px_20px_rgba(16,185,129,0.4)]'
+                    : 'bg-emerald-500 hover:bg-emerald-600 text-white border border-emerald-400 shadow-[0_4px_20px_rgba(16,185,129,0.4)] cursor-pointer'
                 }`}
               >
                 {isOutOfStock ? (
@@ -693,7 +696,7 @@ const FullscreenFeedCard = ({ post, isActive, onAddToCart, onClose, asMainFeed }
               </motion.button>
             )}
 
-            <div className={`${priceAreaStyle} flex-shrink-0 flex items-center justify-center rounded-xl px-3 sm:px-4 py-3 shadow-2xl`}>
+            <div className={`${priceAreaStyle} flex-shrink-0 flex items-center justify-center rounded-xl px-3 sm:px-4 py-3 shadow-2xl select-none`}>
               <span className={`text-[12px] sm:text-[13px] font-bold whitespace-nowrap ${isOutOfStock ? 'text-red-400' : 'text-white'}`}>
                 {isOutOfStock ? 'Sold out' : `${product?.soldCount || post?.soldCount || 0} sold`}
               </span>
@@ -826,12 +829,12 @@ const FeedImmersiveViewer = ({ posts, initialIndex, onClose, onAddToCart, asMain
         {/* Nav arrows */}
         <AnimatePresence>
           {activeIndex > 0 && (
-            <motion.button key="up" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} whileTap={{ scale: 0.9 }} onClick={goPrev} className="absolute top-20 left-1/2 -translate-x-1/2 z-30 w-10 h-10 rounded-full bg-[var(--bg-secondary)]/80 border border-[var(--border-color)] shadow-xl flex items-center justify-center text-[var(--text-main)] pointer-events-auto backdrop-blur-md hover:bg-[var(--bg-tertiary)] transition-colors">
+            <motion.button key="up" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} whileTap={{ scale: 0.9 }} onClick={goPrev} className="hidden md:flex absolute top-20 left-1/2 -translate-x-1/2 z-30 w-10 h-10 rounded-full bg-[var(--bg-secondary)]/80 border border-[var(--border-color)] shadow-xl items-center justify-center text-[var(--text-main)] pointer-events-auto backdrop-blur-md hover:bg-[var(--bg-tertiary)] transition-colors">
               <ChevronUp size={18} />
             </motion.button>
           )}
           {activeIndex < posts.length - 1 && (
-            <motion.button key="down" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} whileTap={{ scale: 0.9 }} onClick={goNext} className="absolute bottom-[66px] left-1/2 -translate-x-1/2 z-30 w-10 h-10 rounded-full bg-[var(--bg-secondary)]/80 border border-[var(--border-color)] shadow-xl flex items-center justify-center text-[var(--text-main)] pointer-events-auto backdrop-blur-md hover:bg-[var(--bg-tertiary)] transition-colors">
+            <motion.button key="down" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} whileTap={{ scale: 0.9 }} onClick={goNext} className="hidden md:flex absolute bottom-[66px] left-1/2 -translate-x-1/2 z-30 w-10 h-10 rounded-full bg-[var(--bg-secondary)]/80 border border-[var(--border-color)] shadow-xl items-center justify-center text-[var(--text-main)] pointer-events-auto backdrop-blur-md hover:bg-[var(--bg-tertiary)] transition-colors">
               <ChevronDown size={20} />
             </motion.button>
           )}

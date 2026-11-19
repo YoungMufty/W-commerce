@@ -397,13 +397,42 @@ app.use(['/api', '/api/v1'], (req, res, next) => {
 });
 
 
-// Health & readiness probe (single definition)
+// Health & readiness probe (unified definition)
 app.get(['/health', '/api/health', '/api/v1/health'], async (req, res) => {
-    const status = { uptime: process.uptime(), redis: redisManager.getStatus(), env: process.env.NODE_ENV || 'development' };
-    try { await prisma.$queryRawUnsafe('SELECT 1'); status.database = { ok: true }; }
-    catch (err) { status.database = { ok: false, error: err.message }; }
-    const overallUp = status.database.ok && (process.env.NODE_ENV === 'production' ? status.redis.connected : true);
-    return res.status(overallUp ? 200 : 503).json({ status: overallUp ? 'ok' : 'degraded', details: status });
+    let dbStatus = 'disconnected';
+    let dbHealthy = false;
+    try {
+        if (process.env.DATABASE_URL) {
+            await Promise.race([
+                prisma.$queryRaw`SELECT 1`,
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Database query timed out')), 2500))
+            ]);
+            dbStatus = 'connected';
+            dbHealthy = true;
+        } else {
+            dbStatus = 'unconfigured';
+            dbHealthy = false;
+        }
+    } catch (err) {
+        dbStatus = `unreachable: ${err.message}`;
+        dbHealthy = false;
+    }
+
+    const redisStatus = redisManager.getStatus();
+    const isServerless = Boolean(process.env.VERCEL);
+    const isHealthy = dbHealthy || dbStatus === 'unconfigured';
+    const statusCode = isHealthy ? 200 : (isServerless ? 200 : 503);
+
+    return res.status(statusCode).json({
+        success: dbHealthy,
+        status: dbHealthy ? 'healthy' : (dbStatus === 'unconfigured' ? 'degraded_no_database' : 'degraded'),
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV || 'development',
+        serverless: isServerless,
+        database: dbStatus,
+        redis: redisStatus
+    });
 });
 app.get(['/api/redis-status', '/api/v1/redis-status'], (req, res) => {
     return res.json({ status: redisManager.getStatus(), timestamp: new Date().toISOString() });
@@ -600,37 +629,6 @@ eventBus.initialize(redisManager)
 // Dual-prefix registration (/api + /api/v1) is kept only where an existing
 // client or integration depends on the non-versioned path.
 
-// ── Health Check (Liveness & Database Readiness) ───────────────────────────
-app.get(['/health', '/api/health', '/api/v1/health'], async (req, res) => {
-    let dbStatus = 'disconnected';
-    let dbHealthy = false;
-    try {
-        if (process.env.DATABASE_URL) {
-            await Promise.race([
-                prisma.$queryRaw`SELECT 1`,
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Database query timed out')), 2500))
-            ]);
-            dbStatus = 'connected';
-            dbHealthy = true;
-        } else {
-            dbStatus = 'unconfigured';
-            dbHealthy = false;
-        }
-    } catch (err) {
-        dbStatus = `unreachable: ${err.message}`;
-        dbHealthy = false;
-    }
-
-    const statusCode = dbHealthy ? 200 : (dbStatus === 'unconfigured' ? 200 : 503);
-    res.status(statusCode).json({
-        success: dbHealthy,
-        status: dbHealthy ? 'healthy' : (dbStatus === 'unconfigured' ? 'degraded_no_database' : 'degraded'),
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development',
-        serverless: Boolean(process.env.VERCEL),
-        database: dbStatus
-    });
-});
 
 // Deprecation header: warn consumers of legacy /api/* (non-versioned) paths.
 // These will be removed in a future major release — clients must migrate to /api/v1/*.
@@ -702,7 +700,7 @@ app.use(['/api/config', '/api/v1/config'], require('./routes/configRoutes'));
 app.use('/api/v1/system', require('./routes/systemRoutes'));
 app.use(['/api/payments', '/api/v1/payments'], require('./routes/paymentProofRoutes'));
 app.use(['/api/logs', '/api/v1/logs'], require('./routes/logRoutes'));
-app.use(['/api/stores', '/api/v1/stores'], require('./routes/storeRoutes'));
+app.use(['/api/stores', '/api/v1/stores', '/api/store', '/api/v1/store'], require('./routes/storeRoutes'));
 app.use(['/api/messages', '/api/v1/messages'], require('./routes/messageRoutes'));
 
 // W-Commerce PayAI International Shopping Layer
@@ -809,96 +807,115 @@ app.use((req, res) => {
     });
 });
 
-const Sentry = require("@sentry/node");
-Sentry.setupExpressErrorHandler(app);
+try {
+    const Sentry = require("@sentry/node");
+    if (typeof Sentry.setupExpressErrorHandler === 'function') {
+        Sentry.setupExpressErrorHandler(app);
+    }
+} catch (sentryErr) {
+    logger.warn(`Sentry express error handler setup skipped: ${sentryErr.message}`);
+}
 
 // ── Global Error Handler ──────────────────────────────────────────────────────
 // Handles: AppError (operational), Prisma errors, CSRF errors, JWT errors, unknown.
+// Hardened to guarantee clean JSON and prevent Vercel 500 FUNCTION_INVOCATION_FAILED
 app.use((err, req, res, next) => {
-    const isProduction = process.env.NODE_ENV === 'production';
+    try {
+        const isProduction = process.env.NODE_ENV === 'production';
 
-    // Already sent a response (streaming, etc.) — delegate to Express default
-    if (res.headersSent) {
-        return next(err);
-    }
+        // Already sent a response (streaming, etc.) — delegate to Express default
+        if (res.headersSent) {
+            return next(err);
+        }
 
-    // ── 1. CSRF error ─────────────────────────────────────────────────────────
-    if (err.code === 'EBADCSRFTOKEN') {
-        return res.status(403).json({
-            success: false,
-            code: 'CSRF_INVALID',
-            message: 'Invalid or missing CSRF token. Please refresh the page and try again.'
-        });
-    }
-
-    // ── 2. JWT errors ─────────────────────────────────────────────────────────
-    if (err.name === 'JsonWebTokenError') {
-        return res.status(401).json({ success: false, code: 'TOKEN_INVALID', message: 'Invalid authentication token' });
-    }
-    if (err.name === 'TokenExpiredError') {
-        return res.status(401).json({ success: false, code: 'TOKEN_EXPIRED', message: 'Session expired. Please log in again.' });
-    }
-
-    // ── 3. Prisma errors ──────────────────────────────────────────────────────
-    if (isDatabaseError(err)) {
-        const appErr = prismaErrorToAppError(err);
-        if (appErr) {
-            if (appErr.statusCode < 500) {
-                logger.warn(`[DB:${err.code}] ${req.method} ${req.path} — ${appErr.message}`);
-            } else {
-                logger.error(`[DB:${err.code}] ${req.method} ${req.path} — ${err.message}`);
-            }
-            return res.status(appErr.statusCode).json({
+        // ── 1. CSRF error ─────────────────────────────────────────────────────────
+        if (err?.code === 'EBADCSRFTOKEN') {
+            return res.status(403).json({
                 success: false,
-                code: err.code || appErr.code,
-                message: appErr.message
+                code: 'CSRF_INVALID',
+                message: 'Invalid or missing CSRF token. Please refresh the page and try again.'
             });
         }
-        // Unknown DB error
-        logger.error(`[DB:UNKNOWN] ${req.method} ${req.path} — ${err.message}\n${err.stack}`);
-        return res.status(503).json({
+
+        // ── 2. JWT errors ─────────────────────────────────────────────────────────
+        if (err?.name === 'JsonWebTokenError') {
+            return res.status(401).json({ success: false, code: 'TOKEN_INVALID', message: 'Invalid authentication token' });
+        }
+        if (err?.name === 'TokenExpiredError') {
+            return res.status(401).json({ success: false, code: 'TOKEN_EXPIRED', message: 'Session expired. Please log in again.' });
+        }
+
+        // ── 3. Prisma errors ──────────────────────────────────────────────────────
+        if (isDatabaseError(err)) {
+            const appErr = prismaErrorToAppError(err);
+            if (appErr) {
+                if (appErr.statusCode < 500) {
+                    logger.warn(`[DB:${err.code}] ${req.method} ${req.path} — ${appErr.message}`);
+                } else {
+                    logger.error(`[DB:${err.code}] ${req.method} ${req.path} — ${err.message}`);
+                }
+                return res.status(appErr.statusCode).json({
+                    success: false,
+                    code: err.code || appErr.code,
+                    message: appErr.message
+                });
+            }
+            // Unknown DB error
+            logger.error(`[DB:UNKNOWN] ${req.method} ${req.path} — ${err?.message || 'Database error'}\n${err?.stack || ''}`);
+            return res.status(503).json({
+                success: false,
+                code: 'DB_ERROR',
+                message: 'Database error. Please try again shortly.'
+            });
+        }
+
+        // ── 4. Operational AppError ───────────────────────────────────────────────
+        if (err?.isOperational) {
+            logger.warn(`[APP:${err.code}] ${req.method} ${req.path} — ${err.message}`);
+            return res.status(err.statusCode || 400).json({
+                success: false,
+                code: err.code || 'OPERATIONAL_ERROR',
+                message: err.message
+            });
+        }
+
+        // ── 5. Multer / file upload errors ────────────────────────────────────────
+        if (err?.code === 'LIMIT_FILE_SIZE') {
+            return res.status(413).json({ success: false, code: 'FILE_TOO_LARGE', message: 'File size exceeds the 4MB limit. Please compress your file and try again.' });
+        }
+        if (err?.code === 'LIMIT_UNEXPECTED_FILE') {
+            return res.status(400).json({ success: false, code: 'UNEXPECTED_FILE', message: 'Unexpected file field in upload' });
+        }
+
+        // ── 6. Zod validation errors ─────────────────────────────────────────────
+        if (err?.name === 'ZodError') {
+            return res.status(400).json({
+                success: false,
+                code: 'VALIDATION_ERROR',
+                message: 'Invalid request data',
+                errors: err.errors?.map(e => ({ field: e.path.join('.'), message: e.message }))
+            });
+        }
+
+        // ── 7. Unknown / programming error ───────────────────────────────────────
+        logger.error(`[UNHANDLED] ${req.method} ${req.path} — ${err?.message || 'Internal server error'}\n${err?.stack || ''}`);
+        return res.status(500).json({
             success: false,
-            code: 'DB_ERROR',
-            message: 'Database error. Please try again shortly.'
+            code: 'INTERNAL_ERROR',
+            message: err?.message || 'Internal server error',
+            ...(isProduction ? {} : { stack: err?.stack })
         });
+    } catch (handlerErr) {
+        logger.error(`[CRITICAL ERROR HANDLER FAILURE] ${handlerErr?.message}`);
+        if (!res.headersSent) {
+            return res.status(500).json({
+                success: false,
+                code: 'INTERNAL_ERROR',
+                message: 'Internal server error'
+            });
+        }
+        return next(handlerErr);
     }
-
-    // ── 4. Operational AppError ───────────────────────────────────────────────
-    if (err.isOperational) {
-        logger.warn(`[APP:${err.code}] ${req.method} ${req.path} — ${err.message}`);
-        return res.status(err.statusCode).json({
-            success: false,
-            code: err.code,
-            message: err.message
-        });
-    }
-
-    // ── 5. Multer / file upload errors ────────────────────────────────────────
-    if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(413).json({ success: false, code: 'FILE_TOO_LARGE', message: 'File size exceeds the 4MB limit. Please compress your file and try again.' });
-    }
-    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-        return res.status(400).json({ success: false, code: 'UNEXPECTED_FILE', message: 'Unexpected file field in upload' });
-    }
-
-    // ── 6. Zod validation errors ─────────────────────────────────────────────
-    if (err.name === 'ZodError') {
-        return res.status(400).json({
-            success: false,
-            code: 'VALIDATION_ERROR',
-            message: 'Invalid request data',
-            errors: err.errors?.map(e => ({ field: e.path.join('.'), message: e.message }))
-        });
-    }
-
-    // ── 7. Unknown / programming error ───────────────────────────────────────
-    logger.error(`[UNHANDLED] ${req.method} ${req.path} — ${err.message}\n${err.stack}`);
-    return res.status(500).json({
-        success: false,
-        code: 'INTERNAL_ERROR',
-        message: isProduction ? 'An unexpected error occurred. Our team has been notified.' : err.message,
-        ...(isProduction ? {} : { stack: err.stack })
-    });
 });
 
 module.exports = app;

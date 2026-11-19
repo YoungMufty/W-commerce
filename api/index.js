@@ -2,6 +2,8 @@
  * Root Vercel Serverless Entrypoint for /api routes
  */
 'use strict';
+process.env.VERCEL = process.env.VERCEL || '1';
+
 const path = require('path');
 const dotenv = require('dotenv');
 

@@ -14,12 +14,15 @@
     "build": "npm run db:generate:prod && npm run build:production",
     "build:production": "npm run build --workspace=frontend",
     "db:sync-postgres-schema": "node scripts/sync-postgres-schema.cjs",
-    "db:generate:prod": "prisma generate --schema=database/prisma/postgres/schema.prisma",
+    "db:generate:prod": "node scripts/sync-postgres-schema.cjs && prisma generate --schema=database/prisma/postgres/schema.prisma",
     "prisma:generate": "prisma generate --schema=database/prisma/postgres/schema.prisma",
     "prisma:deploy": "prisma migrate deploy --schema=database/prisma/postgres/schema.prisma",
     "db:migrate:deploy": "prisma migrate deploy --schema=database/prisma/postgres/schema.prisma",
     "db:test-supabase": "node scripts/test-supabase-connection.cjs",
     "db:migrate-data": "node scripts/migrate-sqlite-to-postgres.cjs",
+    "db:seed:prod": "node scripts/seed-from-sqlite.cjs",
+    "db:sync:supabase": "node scripts/seed-from-sqlite.cjs",
+    "db:sync:dry-run": "node scripts/seed-from-sqlite.cjs --dry-run",
     "env:validate": "node scripts/validate-production-env.cjs"
   },
   "dependencies": {

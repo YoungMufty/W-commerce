@@ -6,6 +6,8 @@ const { validate } = require('../middleware/inputValidation');
 const cache = require('../middleware/cacheMiddleware');
 
 router.get('/', cache(120), productController.getAllProducts);
+router.get('/all', cache(120), productController.getAllProducts);
+router.get('/products', cache(120), productController.getAllProducts);
 router.get('/splash-manifest', productController.getSplashManifest);
 router.get('/trending', cache(60), productController.getTrendingProducts);
 router.get('/search', productController.searchProducts);

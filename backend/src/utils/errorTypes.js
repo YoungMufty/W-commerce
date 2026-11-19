@@ -44,6 +44,16 @@ const tooManyRequests = (msg = 'Too many requests, please slow down') =>
 // Reference: https://www.prisma.io/docs/reference/api-reference/error-reference
 
 const PRISMA_HTTP_MAP = {
+    // ── Connection & Pool Errors (P1xxx) ─────────────────────────────────────
+    P1000: { status: 401, message: 'Database authentication failed. Please verify credentials in DATABASE_URL.' },
+    P1001: { status: 503, message: 'Database server unreachable. Please check host status or unpause Supabase project.' },
+    P1002: { status: 504, message: 'Database server reached but connection timed out.' },
+    P1003: { status: 500, message: 'Database does not exist on target server.' },
+    P1008: { status: 504, message: 'Database operation timed out.' },
+    P1011: { status: 500, message: 'Error opening TLS/SSL connection to database.' },
+    P1017: { status: 503, message: 'Database server closed the connection. Reconnecting...' },
+
+    // ── Query & Constraint Errors (P2xxx) ────────────────────────────────────
     P2000: { status: 400, message: 'Input value too long for the field' },
     P2001: { status: 404, message: 'Record not found' },
     P2002: { status: 409, message: 'A record with this value already exists' },
@@ -114,11 +124,17 @@ function prismaErrorToAppError(err) {
  * isDatabaseError — detect any Prisma or underlying DB error
  */
 function isDatabaseError(err) {
+    if (!err) return false;
     return (
-        err.code?.startsWith('P') ||
-        err.name?.startsWith('PrismaClient') ||
-        err.message?.includes('connect ECONNREFUSED') ||
-        err.message?.includes('Can\'t reach database server')
+        (typeof err.code === 'string' && (err.code.startsWith('P') || err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT')) ||
+        (typeof err.name === 'string' && err.name.startsWith('PrismaClient')) ||
+        (typeof err.message === 'string' && (
+            err.message.includes('connect ECONNREFUSED') ||
+            err.message.includes('Can\'t reach database server') ||
+            err.message.includes('Connection pool timed out') ||
+            err.message.includes('Server has closed the connection') ||
+            err.message.includes('Tenant or user not found')
+        ))
     );
 }
 

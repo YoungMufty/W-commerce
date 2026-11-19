@@ -310,6 +310,9 @@ export const useSellerStore = create((set, get) => ({
       set({ isLoading: true });
       const response = await axios.put('/api/v1/stores/profile', configData);
       if (response.data.success) {
+        if (response.data.data) {
+          set({ storeConfig: response.data.data });
+        }
         set({ isLoading: false });
         return true;
       }

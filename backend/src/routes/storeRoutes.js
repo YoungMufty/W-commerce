@@ -54,4 +54,7 @@ router.get('/:storeId/collections', async (req, res) => {
   res.json({ success: true, collections: [] });
 });
 
+// Store Details by ID or slug (public fallback)
+router.get('/:id', optionalProtect, storeController.getStoreById);
+
 module.exports = router;

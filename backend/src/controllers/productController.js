@@ -51,6 +51,20 @@ function parseIdList(value) {
 }
 
 /**
+ * Race a database promise against a timeout to prevent Vercel / serverless hangs on cold start
+ */
+const DB_QUERY_TIMEOUT_MS = 3500;
+function withDbTimeout(promise, ms = DB_QUERY_TIMEOUT_MS, errorMsg = 'Database query timeout') {
+    let timer;
+    const timeoutPromise = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(errorMsg)), ms);
+    });
+    return Promise.race([promise, timeoutPromise]).finally(() => {
+        if (timer) clearTimeout(timer);
+    });
+}
+
+/**
  * Strips confidential bottomPrice from product representations for buyers and public endpoints
  */
 function sanitizeProductForBuyer(product, currentUserId, userRole) {
@@ -270,33 +284,70 @@ exports.uploadProductAudio = async (req, res) => {
     }
 };
 
-// Get all products (with filtering, sorting, pagination)
+// Get all products (with bulletproof filtering, sorting, pagination, and cold-start fallbacks)
 exports.getAllProducts = async (req, res) => {
-    try {
-        const { page = 1, limit = 12, category, minPrice, maxPrice, origin, format, sort, search, verifiedOnly, hasImages, storeId } = req.query;
+    const query = req.query || {};
+    const page = Math.max(1, parseInt(query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(query.limit, 10) || 12));
+    const skip = (page - 1) * limit;
+    const take = limit;
 
+    const {
+        category,
+        minPrice,
+        maxPrice,
+        origin,
+        format,
+        sort,
+        search,
+        verifiedOnly,
+        hasImages,
+        storeId
+    } = query;
+
+    // Fast-path: if DATABASE_URL is not configured, directly return curated starter catalog
+    if (!process.env.DATABASE_URL || !process.env.DATABASE_URL.trim()) {
+        logger.warn('[getAllProducts] DATABASE_URL not set; returning starter catalog directly.');
+        const fallback = getFilteredStarterProducts(query);
+        return res.json({
+            success: true,
+            count: fallback.products.length,
+            total: fallback.total || fallback.products.length,
+            data: fallback.products,
+            products: fallback.products,
+            pagination: {
+                total: fallback.total || fallback.products.length,
+                page: fallback.page || 1,
+                pages: fallback.pages || 1
+            }
+        });
+    }
+
+    try {
         const where = { isArchived: false, store: { approvalStatus: 'APPROVED' }, stock: { gt: 0 } };
 
-        if (storeId) {
-            where.storeId = storeId;
+        if (storeId && typeof storeId === 'string' && storeId.trim()) {
+            where.storeId = storeId.trim();
         }
 
         // Search
-        if (search) {
+        if (search && typeof search === 'string' && search.trim()) {
+            const searchTerm = search.trim();
             where.OR = [
-                { title: { contains: search } },
-                { description: { contains: search } },
-                { id: { contains: search } },
-                { category: { contains: search } },
-                { tags: { contains: search } },
-                { store: { storeName: { contains: search } } },
-                { store: { user: { fullName: { contains: search } } } }
+                { title: { contains: searchTerm } },
+                { description: { contains: searchTerm } },
+                { id: { contains: searchTerm } },
+                { category: { contains: searchTerm } },
+                { tags: { contains: searchTerm } },
+                { store: { storeName: { contains: searchTerm } } },
+                { store: { user: { fullName: { contains: searchTerm } } } }
             ];
         }
 
         // 1. Categories Filter (supports comma-separated multiple categories)
-        if (category && category !== 'All Items' && category !== 'all') {
-            const categories = String(category).split(',').map(c => c.trim().toLowerCase()).filter(Boolean);
+        if (category && category !== 'All Items' && category !== 'all' && category !== 'foryou') {
+            const catStr = Array.isArray(category) ? category.join(',') : String(category);
+            const categories = catStr.split(',').map(c => c.trim().toLowerCase()).filter(Boolean);
             if (categories.length > 0) {
                 const dbCategories = categories.flatMap(c => {
                     const mapped = [c];
@@ -314,24 +365,29 @@ exports.getAllProducts = async (req, res) => {
                 if (catConditions.length > 0) {
                     if (catConditions.length === 1) {
                         where.category = catConditions[0].category;
+                    } else if (where.OR) {
+                        where.AND = where.AND || [];
+                        where.AND.push({ OR: catConditions });
                     } else {
-                        where.OR = where.OR || [];
-                        where.OR.push(...catConditions);
+                        where.OR = catConditions;
                     }
                 }
             }
         }
 
-        // 2. Price Range Filter
-        if (minPrice || maxPrice) {
+        // 2. Price Range Filter (safely reject NaN)
+        const minP = minPrice !== undefined && minPrice !== null && minPrice !== '' ? parseFloat(minPrice) : NaN;
+        const maxP = maxPrice !== undefined && maxPrice !== null && maxPrice !== '' ? parseFloat(maxPrice) : NaN;
+        if (!isNaN(minP) || !isNaN(maxP)) {
             where.price = {};
-            if (minPrice) where.price.gte = parseFloat(minPrice);
-            if (maxPrice) where.price.lte = parseFloat(maxPrice);
+            if (!isNaN(minP) && minP >= 0) where.price.gte = minP;
+            if (!isNaN(maxP) && maxP >= 0) where.price.lte = maxP;
         }
 
-        // 3. Seller Ship Origin Filter (supports comma-separated multiple origins, maps to country or originHub)
+        // 3. Seller Ship Origin Filter
         if (origin && origin !== 'all') {
-            const origins = String(origin).split(',').map(o => o.trim().toLowerCase()).filter(Boolean);
+            const originStr = Array.isArray(origin) ? origin.join(',') : String(origin);
+            const origins = originStr.split(',').map(o => o.trim().toLowerCase()).filter(Boolean);
             const originConditions = [];
 
             origins.forEach(orig => {
@@ -354,14 +410,19 @@ exports.getAllProducts = async (req, res) => {
             });
 
             if (originConditions.length > 0) {
-                where.OR = where.OR || [];
-                where.OR.push(...originConditions);
+                if (where.OR) {
+                    where.AND = where.AND || [];
+                    where.AND.push({ OR: originConditions });
+                } else {
+                    where.OR = originConditions;
+                }
             }
         }
 
-        // 4. Buying Format Filter (supports comma-separated formats)
+        // 4. Buying Format Filter
         if (format) {
-            const formats = String(format).split(',').map(f => f.trim().toLowerCase()).filter(Boolean);
+            const formatStr = Array.isArray(format) ? format.join(',') : String(format);
+            const formats = formatStr.split(',').map(f => f.trim().toLowerCase()).filter(Boolean);
             const formatConditions = [];
 
             formats.forEach(form => {
@@ -380,15 +441,17 @@ exports.getAllProducts = async (req, res) => {
             if (formatConditions.length > 0) {
                 if (formatConditions.length === 1) {
                     Object.assign(where, formatConditions[0]);
+                } else if (where.OR) {
+                    where.AND = where.AND || [];
+                    where.AND.push({ OR: formatConditions });
                 } else {
-                    where.OR = where.OR || [];
-                    where.OR.push(...formatConditions);
+                    where.OR = formatConditions;
                 }
             }
         }
 
         // 5. Store Verification Filter
-        if (verifiedOnly === 'true') {
+        if (verifiedOnly === 'true' || verifiedOnly === true) {
             where.store = {
                 ...(where.store || {}),
                 isVerified: true
@@ -396,16 +459,16 @@ exports.getAllProducts = async (req, res) => {
         }
 
         // 6. Has Images Filter
-        if (hasImages === 'true') {
+        if (hasImages === 'true' || hasImages === true) {
             where.images = {
                 some: {}
             };
         }
 
-        // 7. Sorting: Boosted products get premier ranking to maximize daily views and impressions
+        // 7. Sorting
         let orderBy = [{ isAdBoosted: 'desc' }, { viewCount: 'desc' }, { createdAt: 'desc' }];
-        if (sort) {
-            const normalizedSort = sort.toLowerCase();
+        if (sort && typeof sort === 'string') {
+            const normalizedSort = sort.toLowerCase().trim();
             if (normalizedSort.includes('low') || normalizedSort.includes('asc')) {
                 orderBy = [{ isAdBoosted: 'desc' }, { price: 'asc' }];
             } else if (normalizedSort.includes('high') || normalizedSort.includes('desc')) {
@@ -421,49 +484,52 @@ exports.getAllProducts = async (req, res) => {
             }
         }
 
-        const skip = (parseInt(page) - 1) * parseInt(limit);
-        const take = parseInt(limit);
-
-        const [products, total] = await prisma.$transaction([
-            prisma.product.findMany({
-                where,
-                include: {
-                    store: {
-                        include: {
-                            user: {
-                                // BUG-PROD-06: email removed from public listing — no reason to expose buyer emails
-                                select: { id: true, fullName: true }
+        // Execute query with timeout protection (max 3500ms) to ensure serverless never hangs
+        const [products, total] = await withDbTimeout(
+            Promise.all([
+                prisma.product.findMany({
+                    where,
+                    include: {
+                        store: {
+                            include: {
+                                user: {
+                                    select: { id: true, fullName: true }
+                                }
                             }
-                        }
+                        },
+                        images: true,
+                        options: true
                     },
-                    images: true,
-                    options: true
-                },
-                orderBy,
-                skip,
-                take
-            }),
-            prisma.product.count({ where })
-        ]);
+                    orderBy,
+                    skip,
+                    take
+                }),
+                prisma.product.count({ where }).catch(countErr => {
+                    logger.warn(`Product count failed: ${countErr.message}`);
+                    return 0;
+                })
+            ]),
+            3500,
+            'Database products query timed out'
+        );
 
         const currentUserId = req.user?.id || resolveOptionalUserId(req);
         const userRole = req.user?.role;
-        let sanitizedProducts = products.map(p => sanitizeProductForBuyer(p, currentUserId, userRole));
-        let responseTotal = total;
+        let sanitizedProducts = (Array.isArray(products) ? products : []).map(p => sanitizeProductForBuyer(p, currentUserId, userRole));
+        let responseTotal = typeof total === 'number' && total > 0 ? total : sanitizedProducts.length;
 
-        // If DB is empty or returned 0 products (e.g. freshly deployed remote DB),
-        // supply curated starter drops so /feed and product discovery are immediately alive
+        // If DB returned 0 products (e.g. freshly deployed remote DB, unseeded DB, or unapproved stores),
+        // supply curated starter drops so /shop, /feed, and discovery are immediately alive
         if (sanitizedProducts.length === 0) {
-            let fallback = getFilteredStarterProducts(req.query);
-            if (fallback.products.length === 0) {
-                // If filters were too restrictive for the starter set, fallback to all starters
+            let fallback = getFilteredStarterProducts(query);
+            if (!fallback || !fallback.products || fallback.products.length === 0) {
                 fallback = getFilteredStarterProducts({ limit: take });
             }
-            sanitizedProducts = fallback.products;
-            responseTotal = fallback.total;
+            sanitizedProducts = fallback?.products || [];
+            responseTotal = fallback?.total || sanitizedProducts.length;
         }
 
-        res.json({
+        return res.json({
             success: true,
             count: sanitizedProducts.length,
             total: responseTotal,
@@ -471,59 +537,93 @@ exports.getAllProducts = async (req, res) => {
             products: sanitizedProducts,
             pagination: {
                 total: responseTotal,
-                page: parseInt(page) || 1,
+                page,
                 pages: Math.ceil(responseTotal / take) || 1
             }
         });
     } catch (error) {
         logger.error(`Get All Products Error: ${error.message}`);
-        // Graceful fallback to starter catalog during DB connection warming/outage
-        const fallback = getFilteredStarterProducts(req.query);
-        const fallbackProducts = fallback.products.length > 0 ? fallback.products : getFilteredStarterProducts({ limit: 12 }).products;
-        return res.json({
-            success: true,
-            count: fallbackProducts.length,
-            total: fallbackProducts.length,
-            data: fallbackProducts,
-            products: fallbackProducts,
-            pagination: {
-                total: fallbackProducts.length,
-                page: 1,
-                pages: 1
-            }
-        });
+        // Bulletproof fallback to starter catalog during DB connection warming, outage, or cold start
+        try {
+            const fallback = getFilteredStarterProducts(req.query || {});
+            const fallbackProducts = (fallback?.products && fallback.products.length > 0)
+                ? fallback.products
+                : (getFilteredStarterProducts({ limit: 12 })?.products || (STARTER_PRODUCTS || []).slice(0, 12));
+            const count = fallbackProducts.length;
+            return res.json({
+                success: true,
+                count,
+                total: count,
+                data: fallbackProducts,
+                products: fallbackProducts,
+                pagination: {
+                    total: count,
+                    page: 1,
+                    pages: 1
+                }
+            });
+        } catch (fallbackErr) {
+            logger.error(`Starter products fallback error: ${fallbackErr.message}`);
+            const rawStarters = (STARTER_PRODUCTS || []).slice(0, 12);
+            return res.json({
+                success: true,
+                count: rawStarters.length,
+                total: rawStarters.length,
+                data: rawStarters,
+                products: rawStarters,
+                pagination: { total: rawStarters.length, page: 1, pages: 1 }
+            });
+        }
     }
 };
 
+// Explicit alias for getProducts
+exports.getProducts = exports.getAllProducts;
+
 // Get trending products (Public)
 exports.getTrendingProducts = async (req, res) => {
-    try {
-        const limit = Math.min(Math.max(1, parseInt(req.query.limit) || 10), 50);
-        const products = await prisma.product.findMany({
-            where: {
-                isArchived: false,
-                stock: { gt: 0 },
-                store: { approvalStatus: 'APPROVED' }
-            },
-            take: limit,
-            orderBy: [{ isAdBoosted: 'desc' }, { viewCount: 'desc' }, { createdAt: 'desc' }],
-            include: {
-                store: {
-                    include: {
-                        user: {
-                            // BUG-PROD-01: Removed email — public endpoint must not expose seller emails
-                            select: { id: true, fullName: true }
-                        }
-                    }
-                },
-                images: true,
-                options: true,
-                pool: true
-            }
+    const limit = Math.min(Math.max(1, parseInt(req.query?.limit, 10) || 10), 50);
+
+    if (!process.env.DATABASE_URL || !process.env.DATABASE_URL.trim()) {
+        const fallback = getFilteredStarterProducts({ sort: 'popular', limit });
+        return res.json({
+            success: true,
+            count: fallback.products.length,
+            data: fallback.products,
+            products: fallback.products
         });
+    }
+
+    try {
+        const products = await withDbTimeout(
+            prisma.product.findMany({
+                where: {
+                    isArchived: false,
+                    stock: { gt: 0 },
+                    store: { approvalStatus: 'APPROVED' }
+                },
+                take: limit,
+                orderBy: [{ isAdBoosted: 'desc' }, { viewCount: 'desc' }, { createdAt: 'desc' }],
+                include: {
+                    store: {
+                        include: {
+                            user: {
+                                select: { id: true, fullName: true }
+                            }
+                        }
+                    },
+                    images: true,
+                    options: true,
+                    pool: true
+                }
+            }),
+            3000,
+            'Trending products query timed out'
+        );
+
         const currentUserId = req.user?.id || resolveOptionalUserId(req);
         const userRole = req.user?.role;
-        let sanitizedProducts = products.map(p => sanitizeProductForBuyer(p, currentUserId, userRole));
+        let sanitizedProducts = (Array.isArray(products) ? products : []).map(p => sanitizeProductForBuyer(p, currentUserId, userRole));
 
         if (sanitizedProducts.length === 0) {
             const fallback = getFilteredStarterProducts({ sort: 'popular', limit });
@@ -548,50 +648,97 @@ exports.getTrendingProducts = async (req, res) => {
     }
 };
 
+// Fallback curated categories
+function getFallbackCategories() {
+    return [
+        { name: 'Flash Deals', count: 4, icon: '⚡' },
+        { name: 'Electronics', count: 4, icon: '📱' },
+        { name: 'Fashion', count: 3, icon: '👗' },
+        { name: 'Gaming Gear', count: 2, icon: '🎮' },
+        { name: 'Luxury', count: 1, icon: '💎' },
+        { name: 'Home & Living', count: 1, icon: '🏠' }
+    ];
+}
+
 // Get unique categories with counts (Public)
 exports.getCategories = async (req, res) => {
-    try {
-        const categories = await prisma.product.groupBy({
-            by: ['category'],
-            where: { isArchived: false, store: APPROVED_STORE },
-            _count: {
-                _all: true
-            }
-        });
+    if (!process.env.DATABASE_URL || !process.env.DATABASE_URL.trim()) {
+        return res.json({ success: true, categories: getFallbackCategories() });
+    }
 
-        // Format to match frontend expectations
-        const result = categories.map(c => ({
+    try {
+        const categories = await withDbTimeout(
+            prisma.product.groupBy({
+                by: ['category'],
+                where: { isArchived: false, store: APPROVED_STORE },
+                _count: {
+                    _all: true
+                }
+            }),
+            3000,
+            'Categories query timed out'
+        );
+
+        let result = (Array.isArray(categories) ? categories : []).map(c => ({
             name: c.category,
             count: c._count._all,
             icon: getCategoryIcon(c.category)
         }));
 
+        if (result.length === 0) {
+            result = getFallbackCategories();
+        }
+
         res.json({ success: true, categories: result });
     } catch (error) {
         logger.error(`Get Categories Error: ${error.message}`);
-        res.status(500).json({ success: false, message: 'Server error' });
+        res.json({ success: true, categories: getFallbackCategories() });
     }
 };
 
+// Fallback menu data
+function getFallbackMenu() {
+    return {
+        'Electronics': [
+            { name: 'Audio & Tech', image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80' },
+            { name: 'Gaming Gear', image: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=600&q=80' },
+            { name: 'Tech Accessories', image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=600&q=80' }
+        ],
+        'Fashion': [
+            { name: 'Footwear & Streetwear', image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80' },
+            { name: 'Apparel', image: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=600&q=80' },
+            { name: 'Luxury & Accessories', image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80' }
+        ]
+    };
+}
+
 // Get hierarchical menu data (Category -> Subcategories)
 exports.getMenuData = async (req, res) => {
+    if (!process.env.DATABASE_URL || !process.env.DATABASE_URL.trim()) {
+        return res.json({ success: true, menu: getFallbackMenu() });
+    }
+
     try {
-        const products = await prisma.product.findMany({
-            where: { isArchived: false, store: APPROVED_STORE },
-            select: {
-                category: true,
-                subCategory: true,
-                images: {
-                    where: { isPrimary: true },
-                    take: 1,
-                    select: { url: true }
+        const products = await withDbTimeout(
+            prisma.product.findMany({
+                where: { isArchived: false, store: APPROVED_STORE },
+                select: {
+                    category: true,
+                    subCategory: true,
+                    images: {
+                        where: { isPrimary: true },
+                        take: 1,
+                        select: { url: true }
+                    }
                 }
-            }
-        });
+            }),
+            3000,
+            'Menu data query timed out'
+        );
 
         const menu = {};
 
-        products.forEach(p => {
+        (Array.isArray(products) ? products : []).forEach(p => {
             if (!p.category) return;
             if (!menu[p.category]) menu[p.category] = [];
             
@@ -599,7 +746,7 @@ exports.getMenuData = async (req, res) => {
             const existingSub = menu[p.category].find(s => s.name === sub);
             
             if (!existingSub) {
-                let img = p.images[0] ? p.images[0].url : null;
+                let img = p.images?.[0] ? p.images[0].url : null;
                 if (img && !img.startsWith('http') && !img.startsWith('/')) img = '/uploads/' + img;
                 
                 menu[p.category].push({
@@ -609,10 +756,14 @@ exports.getMenuData = async (req, res) => {
             }
         });
 
+        if (Object.keys(menu).length === 0) {
+            return res.json({ success: true, menu: getFallbackMenu() });
+        }
+
         res.json({ success: true, menu });
     } catch (error) {
         logger.error(`Get Menu Data Error: ${error.message}`);
-        res.status(500).json({ success: false, message: 'Server error' });
+        res.json({ success: true, menu: getFallbackMenu() });
     }
 };
 
@@ -636,44 +787,80 @@ function getCategoryIcon(cat) {
          const { id } = req.params;
          const buyerId = resolveOptionalUserId(req);
 
-         const product = await prisma.product.findUnique({
-             where: { id },
-             include: {
-                 store: {
+         if (!id) {
+             return res.status(400).json({ success: false, message: 'Product ID is required' });
+         }
+
+         // Instant response for starter drops without hitting database
+         if (String(id).startsWith('starter-')) {
+             const starter = (STARTER_PRODUCTS || []).find(p => p.id === id);
+             if (starter) {
+                 return res.json({
+                     success: true,
+                     product: sanitizeProductForBuyer(starter, buyerId, req.user?.role),
+                     recentViews: 48,
+                     isSubscribedToRestock: false
+                 });
+             }
+         }
+
+         let product = null;
+         try {
+             product = await withDbTimeout(
+                 prisma.product.findUnique({
+                     where: { id },
                      include: {
-                         user: {
-                             select: {
-                                 id: true,
-                                 fullName: true,
-                                 avatarUrl: true
+                         store: {
+                             include: {
+                                 user: {
+                                     select: {
+                                         id: true,
+                                         fullName: true,
+                                         avatarUrl: true
+                                     }
+                                 }
                              }
+                         },
+                         images: true,
+                         options: true,
+                         flashDeals: {
+                             where: {
+                                 isActive: true,
+                                 startDate: { lte: new Date() },
+                                 endDate: { gt: new Date() }
+                             }
+                         },
+                         reviews: {
+                             include: {
+                                 user: true,
+                                 _count: { select: { likes: true } }
+                             },
+                             orderBy: [
+                                 { isTopReview: 'desc' },
+                                 { helpfulCount: 'desc' },
+                                 { createdAt: 'desc' }
+                             ]
                          }
                      }
-                 },
-                 images: true,
-                 options: true,
-                 flashDeals: {
-                     where: {
-                         isActive: true,
-                         startDate: { lte: new Date() },
-                         endDate: { gt: new Date() }
-                     }
-                 },
-                 reviews: {
-                     include: {
-                         user: true,
-                         _count: { select: { likes: true } }
-                     },
-                     orderBy: [
-                         { isTopReview: 'desc' },
-                         { helpfulCount: 'desc' },
-                         { createdAt: 'desc' }
-                     ]
-                 }
-             }
-         });
+                 }),
+                 3000,
+                 'Product query timed out'
+             );
+         } catch (dbErr) {
+             logger.warn(`Get Product DB lookup error: ${dbErr.message}`);
+         }
 
          if (!product) {
+             // Fallback to starter drops if matching
+             const starter = (STARTER_PRODUCTS || []).find(p => p.id === id);
+             if (starter) {
+                 return res.json({
+                     success: true,
+                     product: sanitizeProductForBuyer(starter, buyerId, req.user?.role),
+                     recentViews: 24,
+                     isSubscribedToRestock: false
+                 });
+             }
              return res.status(404).json({ success: false, message: 'Product not found' });
          }
 
@@ -967,32 +1154,47 @@ exports.calculateLandedCost = async (req, res) => {
 
 // Search products
 exports.searchProducts = async (req, res) => {
-    const query = req.query.q || '';
+    const query = req.query.q || req.query.search || '';
+    if (!process.env.DATABASE_URL || !process.env.DATABASE_URL.trim()) {
+        const fallback = getFilteredStarterProducts({ search: query });
+        return res.json({ success: true, products: fallback.products });
+    }
+
     try {
-        // SQLite doesn't support , so we use simple contains
-        const products = await prisma.product.findMany({
-            where: {
-                isArchived: false,
-                store: { approvalStatus: 'APPROVED' },
-                stock: { gt: 0 },
-                OR: [
-                    { title: { contains: query } },
-                    { description: { contains: query } }
-                ]
-            },
-            include: {
-                store: true,
-                images: true,
-                options: true
-            }
-        });
+        const products = await withDbTimeout(
+            prisma.product.findMany({
+                where: {
+                    isArchived: false,
+                    store: { approvalStatus: 'APPROVED' },
+                    stock: { gt: 0 },
+                    OR: [
+                        { title: { contains: query } },
+                        { description: { contains: query } }
+                    ]
+                },
+                include: {
+                    store: true,
+                    images: true,
+                    options: true
+                }
+            }),
+            3000,
+            'Search products query timed out'
+        );
         const currentUserId = req.user?.id || resolveOptionalUserId(req);
         const userRole = req.user?.role;
-        const sanitizedProducts = products.map(p => sanitizeProductForBuyer(p, currentUserId, userRole));
+        let sanitizedProducts = (Array.isArray(products) ? products : []).map(p => sanitizeProductForBuyer(p, currentUserId, userRole));
+
+        if (sanitizedProducts.length === 0) {
+            const fallback = getFilteredStarterProducts({ search: query });
+            sanitizedProducts = fallback.products;
+        }
+
         res.json({ success: true, products: sanitizedProducts });
     } catch (error) {
         logger.error(`Search Error: ${error.message}`);
-        res.status(500).json({ success: false, message: 'Server error' });
+        const fallback = getFilteredStarterProducts({ search: query });
+        res.json({ success: true, products: fallback.products });
     }
 };
 
@@ -1027,14 +1229,14 @@ exports.getSearchSuggestions = async (req, res) => {
         res.json({
             success: true,
             suggestions: {
-                products,
-                stores,
-                categories: categories.map(c => c.category)
+                products: products || [],
+                stores: stores || [],
+                categories: (categories || []).map(c => c.category)
             }
         });
     } catch (error) {
         logger.error(`Suggestions Error: ${error.message}`);
-        res.status(500).json({ success: false, message: 'Server error' });
+        res.json({ success: true, suggestions: { products: [], stores: [], categories: [] } });
     }
 };
 

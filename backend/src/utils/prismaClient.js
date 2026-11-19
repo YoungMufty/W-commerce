@@ -4,16 +4,118 @@ const logger = require('./logger');
 
 const globalForPrisma = globalThis;
 const isProduction = process.env.NODE_ENV === 'production';
+const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 
-// Prevent exhausting database connections in development.
+/**
+ * Resolves and tunes the database connection string for PostgreSQL / Supabase:
+ * - Checks DATABASE_URL, SUPABASE_DATABASE_URL, DIRECT_URL
+ * - For Supabase PgBouncer pooler (port 6543 or pooler.supabase.com): automatically appends pgbouncer=true
+ * - Serverless (Vercel / Lambda): connection_limit=1 to prevent connection pool exhaustion
+ * - Production: connection_limit=5
+ * - Connect and pool timeouts: connect_timeout=15, pool_timeout=15 to prevent hanging queries
+ */
+function resolveAndOptimizeDatabaseUrl() {
+    let url = process.env.DATABASE_URL || process.env.SUPABASE_DATABASE_URL || process.env.DIRECT_URL;
+    if (!url) return null;
+
+    url = url.trim().replace(/^["']|["']$/g, '');
+
+    // Optimize PostgreSQL / Supabase URLs
+    if (url.startsWith('postgres://') || url.startsWith('postgresql://')) {
+        try {
+            const parsed = new URL(url);
+            const isPooler = parsed.port === '6543' || parsed.hostname.includes('pooler.supabase.com');
+
+            // PgBouncer requires pgbouncer=true in transaction pooler mode
+            if (isPooler && !parsed.searchParams.has('pgbouncer')) {
+                parsed.searchParams.set('pgbouncer', 'true');
+            }
+
+            // Connection pool limit tuning
+            if (!parsed.searchParams.has('connection_limit')) {
+                if (isServerless) {
+                    parsed.searchParams.set('connection_limit', '1');
+                } else if (isProduction) {
+                    parsed.searchParams.set('connection_limit', '5');
+                }
+            }
+
+            // Connection and pool timeouts (15 seconds)
+            if (!parsed.searchParams.has('connect_timeout')) {
+                parsed.searchParams.set('connect_timeout', '15');
+            }
+            if (!parsed.searchParams.has('pool_timeout')) {
+                parsed.searchParams.set('pool_timeout', '15');
+            }
+
+            return parsed.toString();
+        } catch (_) {
+            return url;
+        }
+    }
+
+    return url;
+}
+
+const activeDatabaseUrl = resolveAndOptimizeDatabaseUrl();
+if (activeDatabaseUrl) {
+    process.env.DATABASE_URL = activeDatabaseUrl;
+}
+
 // In production, only log errors and warnings — query logging leaks SQL and is a performance sink.
 const prismaLogLevels = isProduction
     ? ['error', 'warn']
     : (process.env.LOG_QUERIES === 'true' ? ['query', 'error', 'warn'] : ['error', 'warn']);
 
-const prisma = globalForPrisma.prisma || new PrismaClient({
+const clientOptions = {
     log: prismaLogLevels,
+};
+
+if (activeDatabaseUrl) {
+    clientOptions.datasources = {
+        db: {
+            url: activeDatabaseUrl,
+        },
+    };
+}
+
+let basePrisma = globalForPrisma.__basePrisma;
+if (!basePrisma) {
+    basePrisma = new PrismaClient(clientOptions);
+    globalForPrisma.__basePrisma = basePrisma;
+}
+
+// ── Query-level connection error guard ───────────────────────────────────────
+// Catches transient connection drops and pool timeouts without crashing Express.
+const extendedPrisma = basePrisma.$extends({
+    query: {
+        $allModels: {
+            async $allOperations({ model, operation, args, query }) {
+                try {
+                    return await query(args);
+                } catch (err) {
+                    const isConnError = (
+                        (typeof err.code === 'string' && (err.code.startsWith('P1') || err.code === 'P2024')) ||
+                        err.name === 'PrismaClientInitializationError' ||
+                        err.name === 'PrismaClientRustPanicError' ||
+                        err.message?.includes('Connection pool timed out') ||
+                        err.message?.includes('Server has closed the connection') ||
+                        err.message?.includes('Can\'t reach database server') ||
+                        err.message?.includes('connect ECONNREFUSED')
+                    );
+
+                    if (isConnError) {
+                        logger.error(`[Prisma:ConnectionFailure] ${model}.${operation} failed: ${err.message}`);
+                    }
+                    // Re-throw so Express error handler catches it cleanly as AppError (503)
+                    throw err;
+                }
+            }
+        }
+    }
 });
+
+const prisma = globalForPrisma.prisma || extendedPrisma;
 
 // ── In-memory fallback delegates for optional/extended models ────────────────
 function createInMemoryDelegate() {
@@ -105,7 +207,9 @@ async function disconnectPrisma() {
     if (isDisconnecting) return;
     isDisconnecting = true;
     try {
-        await prisma.$disconnect();
+        if (basePrisma) {
+            await basePrisma.$disconnect();
+        }
         logger.info('[Prisma] Disconnected from database');
     } catch (e) {
         // ignore disconnect errors during shutdown
@@ -116,21 +220,19 @@ process.on('SIGTERM', disconnectPrisma);
 process.on('SIGINT', disconnectPrisma);
 
 // ── Startup connectivity check ───────────────────────────────────────────────
-// Called once at server startup. Exits with code 1 if DB is unreachable after retries (standalone only).
-// In Vercel serverless, warns and logs clearly instead of calling process.exit(1) to prevent FUNCTION_INVOCATION_FAILED.
+// Verifies connection at startup with exponential backoff retries.
+// In serverless, Vercel, or production with sleeping Supabase, warns clearly
+// and runs in degraded mode instead of calling process.exit(1) to prevent crash loops.
 async function verifyDatabaseConnection(retries = 3, delayMs = 2000) {
     if (!process.env.DATABASE_URL) {
         logger.error('[Prisma] ❌ DATABASE_URL is not configured. Database operations will be unavailable.');
-        if (isProduction && !process.env.VERCEL) {
-            logger.error('[Prisma] Exiting process in standalone production due to missing DATABASE_URL');
-            process.exit(1);
-        }
+        logger.warn('[Prisma] ⚠️ Running in degraded mode without DATABASE_URL');
         return false;
     }
 
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
-            await prisma.$queryRaw`SELECT 1`;
+            await basePrisma.$queryRaw`SELECT 1`;
             logger.info('[Prisma] ✅ Database connection verified');
             return true;
         } catch (err) {
@@ -140,12 +242,8 @@ async function verifyDatabaseConnection(retries = 3, delayMs = 2000) {
                 delayMs = Math.min(delayMs * 2, 10000); // exponential backoff, max 10s
             } else {
                 logger.error(`[Prisma] ❌ Could not connect to database after ${retries} attempts: ${err.message}`);
-                if (isProduction && !process.env.VERCEL) {
-                    logger.error('[Prisma] Exiting process in standalone production due to DB unavailability');
-                    process.exit(1);
-                }
-                // In serverless / development, warn but do not hard-crash the runtime container
-                logger.warn('[Prisma] ⚠️  Running in degraded mode without verified database connection');
+                // In serverless, Vercel, or production with sleeping Supabase, warn but do not hard-crash the container
+                logger.warn('[Prisma] ⚠️ Running in degraded mode without verified database connection. Requests will attempt dynamic connection.');
                 return false;
             }
         }
@@ -153,5 +251,7 @@ async function verifyDatabaseConnection(retries = 3, delayMs = 2000) {
 }
 
 module.exports = prisma;
+module.exports.basePrisma = basePrisma;
 module.exports.verifyDatabaseConnection = verifyDatabaseConnection;
 module.exports.disconnectPrisma = disconnectPrisma;
+module.exports.resolveAndOptimizeDatabaseUrl = resolveAndOptimizeDatabaseUrl;

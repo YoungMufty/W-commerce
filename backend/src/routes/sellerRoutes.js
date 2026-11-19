@@ -13,6 +13,7 @@ const sellerBanningService = require('../services/sellerBanningService');
  * Public — returns seller identity, trust metrics, store reference.
  */
 router.get('/:sellerId/profile', sellerController.getSellerProfile);
+router.get('/profile/:sellerId', sellerController.getSellerProfile);
 router.post('/onboarding', protect, upload.single('document'), sellerController.sellerOnboarding);
 router.post('/:sellerId/follow', protect, sellerController.followSeller);
 router.get('/analytics', protect, authorize('SELLER', 'ADMIN'), analyticsController.getSellerAnalytics);
@@ -349,5 +350,11 @@ router.post('/banning/cure', protect, authorize('SELLER', 'ADMIN'), async (req, 
         res.status(400).json({ success: false, message: error.message || 'Could not cure penalty' });
     }
 });
+
+/**
+ * GET /api/v1/sellers/:sellerId
+ * Direct lookup fallback to match /profile endpoint
+ */
+router.get('/:sellerId', sellerController.getSellerProfile);
 
 module.exports = router;

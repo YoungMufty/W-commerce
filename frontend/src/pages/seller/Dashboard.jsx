@@ -274,7 +274,9 @@ const SellerDashboard = ({ initialTab }) => {
           // fetchedStoreConfig and causes an infinite re-render loop.
           setBrandConfig(parsed);
           
-          if (parsed.paymentGatewayType) setPaymentGateway(parsed.paymentGatewayType);
+          if (parsed.paymentGatewayType) {
+            setPaymentGateway(parsed.paymentGatewayType === 'DIRECT_BANK' ? 'Direct Bank Transfer' : parsed.paymentGatewayType);
+          }
           setBankDetails(prev => ({
             ...prev,
             routingNumber: parsed.routingNumber || prev.routingNumber,

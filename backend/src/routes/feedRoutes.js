@@ -3,6 +3,9 @@ const router = express.Router();
 const feedController = require('../controllers/feedController');
 const { protect } = require('../middleware/authMiddleware');
 
+// Main Feed Discovery endpoint
+router.get('/', feedController.getFeed);
+
 // Comments
 router.get('/:postId/comments', feedController.getComments);
 router.post('/:postId/comments', protect, feedController.postComment);

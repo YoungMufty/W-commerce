@@ -45,7 +45,7 @@ const StoreVerifier = import.meta.env.DEV
 const StorePreviewPage = lazy(() => import('./pages/StorePreviewPage').then(m => ({ default: m.StorePreviewPage })));
 
 // Public Pages
-const Shop = lazy(() => import('./pages/Home'));
+const Shop = lazy(() => import('./pages/Shop'));
 const Search = lazy(() => import('./pages/Search'));
 const Feed = lazy(() => import('./pages/Feed'));
 const Cart = lazy(() => import('./pages/Cart'));

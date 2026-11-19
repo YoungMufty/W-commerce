@@ -8,6 +8,138 @@
 
 const STARTER_PRODUCTS = [
   {
+    id: 'starter-food-chicken-strips-01',
+    title: 'Ten freshly prepared crispy chicken breast strips served with four sauces',
+    description: 'Ten freshly prepared crispy chicken breast strips served with four signature dipping sauces. Golden-fried to crunchy perfection from premium farm-fresh poultry.',
+    price: 10000,
+    shippingFee: 1500,
+    stock: 50,
+    category: 'Food',
+    subCategory: 'Fast Food & Dining',
+    sku: 'FOOD-CHK-01',
+    tags: 'food, chicken, crispy, fast food, dining, strips, meals, sauces, poultry',
+    isFlashSale: false,
+    discount: 0,
+    dealPrice: 10000,
+    rating: 5.0,
+    viewCount: 4890,
+    isAdBoosted: true,
+    isArchived: false,
+    estimatedDeliveryDays: 1,
+    images: [
+      { id: 'img-chick-1', url: 'https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1000&q=80', isPrimary: true }
+    ],
+    imageUrl: 'https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1000&q=80',
+    options: [
+      { id: 'opt-chick-1', name: 'Sauce Selection', values: ['Garlic Mayo & BBQ', 'Sweet Chili & Ranch', 'Spicy Peri-Peri'] }
+    ],
+    storeId: 'starter-store-kalid-01',
+    store: {
+      id: 'starter-store-kalid-01',
+      sellerId: 'starter-seller-kalid',
+      storeName: "TIRIMISIYU KALID's Shop",
+      portfolioSlug: 'tirimisiyu-kalid-shop',
+      isVerified: true,
+      approvalStatus: 'APPROVED',
+      country: 'NG',
+      originHub: 'Lagos Hub',
+      user: { id: 'starter-seller-kalid', fullName: 'TIRIMISIYU KALID' }
+    },
+    _count: { reviews: 72 },
+    reviews: [
+      { rating: 5, comment: 'Crispiest and freshest chicken tenders in town! Sauces were phenomenal.' }
+    ],
+    createdAt: new Date(Date.now() - 3600000 * 2).toISOString()
+  },
+  {
+    id: 'starter-watch-galaxy-01',
+    title: 'Samsung Galaxy Watch Ultra Titanium Edition',
+    description: 'Super AMOLED display, aerospace-grade titanium casing, dual-frequency GPS, 100m water resistance, and advanced wellness biometric sensor suite.',
+    price: 299.99,
+    shippingFee: 0,
+    stock: 25,
+    category: 'Electronics',
+    subCategory: 'Wearables & Smartwatches',
+    sku: 'TECH-GW-01',
+    tags: 'smartwatch, watch, galaxy, samsung, electronics, luxury, wearables, fitness',
+    isFlashSale: true,
+    discount: 17,
+    dealPrice: 249.99,
+    rating: 4.95,
+    viewCount: 4120,
+    isAdBoosted: true,
+    isArchived: false,
+    estimatedDeliveryDays: 2,
+    images: [
+      { id: 'img-gw-1', url: 'https://images.unsplash.com/photo-1579586337278-3befd40fd17a?auto=format&fit=crop&w=1000&q=80', isPrimary: true }
+    ],
+    imageUrl: 'https://images.unsplash.com/photo-1579586337278-3befd40fd17a?auto=format&fit=crop&w=1000&q=80',
+    options: [
+      { id: 'opt-gw-1', name: 'Case Color', values: ['Titanium Gray', 'Titanium Silver', 'Titanium White'] }
+    ],
+    storeId: 'starter-store-luxe-01',
+    store: {
+      id: 'starter-store-luxe-01',
+      sellerId: 'starter-seller-luxe',
+      storeName: 'Luxe Timepieces',
+      portfolioSlug: 'luxe-timepieces',
+      isVerified: true,
+      approvalStatus: 'APPROVED',
+      country: 'US',
+      originHub: 'USA Hub',
+      user: { id: 'starter-seller-luxe', fullName: 'Luxe Timepieces Official' }
+    },
+    _count: { reviews: 56 },
+    reviews: [
+      { rating: 5, comment: 'Phenomenal battery life and the titanium body feels indestructible.' }
+    ],
+    createdAt: new Date(Date.now() - 3600000 * 3).toISOString()
+  },
+  {
+    id: 'starter-streetwear-solis-tee-01',
+    title: 'Solis Cyber Heavyweight Graphic Tee',
+    description: 'Crafted from 300GSM custom combed organic cotton with high-density puff print detailing and relaxed dropped-shoulder silhouette.',
+    price: 65.00,
+    shippingFee: 0,
+    stock: 60,
+    category: 'Fashion',
+    subCategory: 'Streetwear & Apparel',
+    sku: 'APP-SOLIS-01',
+    tags: 'fashion, streetwear, tee, clothing, solis, apparel, oversized, shirt',
+    isFlashSale: false,
+    discount: 0,
+    dealPrice: 65.00,
+    rating: 4.88,
+    viewCount: 3450,
+    isAdBoosted: true,
+    isArchived: false,
+    estimatedDeliveryDays: 2,
+    images: [
+      { id: 'img-solis-1', url: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=80', isPrimary: true }
+    ],
+    imageUrl: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=80',
+    options: [
+      { id: 'opt-solis-1', name: 'Size', values: ['S', 'M', 'L', 'XL'] }
+    ],
+    storeId: 'starter-store-solis-02',
+    store: {
+      id: 'starter-store-solis-02',
+      sellerId: 'starter-seller-solis-street',
+      storeName: 'Solis Streetwear',
+      portfolioSlug: 'solis-streetwear',
+      isVerified: true,
+      approvalStatus: 'APPROVED',
+      country: 'US',
+      originHub: 'USA Hub',
+      user: { id: 'starter-seller-solis-street', fullName: 'Solis Design Lab' }
+    },
+    _count: { reviews: 41 },
+    reviews: [
+      { rating: 5, comment: 'Super dense fabric with vivid puff print. Definitely buying another colorway.' }
+    ],
+    createdAt: new Date(Date.now() - 3600000 * 6).toISOString()
+  },
+  {
     id: 'starter-audio-apex-01',
     title: 'Apex Cybernetic ANC Wireless Headphones',
     description: 'Studio-grade spatial audio with hybrid active noise cancellation, custom 40mm beryllium drivers, and 45-hour ultra-low latency battery.',

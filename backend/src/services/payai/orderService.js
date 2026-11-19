@@ -467,8 +467,10 @@ class PayAIOrderService {
 
         return {
           id: mainOrder.id,
+          source: 'MAIN_ORDER',
           orderNumber: orderNum,
           userId: mainOrder.buyerId,
+          sellerId: mainOrder.sellerId,
           trackingNumber: trackingNum,
           carrier: mainOrder.carrier || 'GIG Logistics Express',
           carrierName: mainOrder.carrier || 'GIG Logistics Express',
@@ -1793,6 +1795,106 @@ class PayAIOrderService {
       };
     }
 
+    if (order.source === 'MAIN_ORDER' || (!order.source && (await prisma.order.findUnique({ where: { id: order.id }, select: { id: true } })))) {
+      const mainOrder = await prisma.order.findUnique({
+        where: { id: order.id },
+        include: { items: true, seller: true }
+      });
+      if (!mainOrder) throw new Error('Order not found');
+
+      const nonCancellable = ['SHIPPED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED', 'COMPLETED', 'CONFIRMED_COMPLETED'];
+      if (nonCancellable.includes(String(mainOrder.status || '').toUpperCase())) {
+        throw new Error(`Order #${order.orderNumber} cannot be cancelled because it has already dispatched or completed (status: ${mainOrder.status}). You can request a return after delivery.`);
+      }
+
+      const wasPaid = ['PAID', 'HELD', 'PAID_IN_ESCROW'].includes(String(mainOrder.paymentStatus || '').toUpperCase()) || mainOrder.status === 'PAID';
+
+      await prisma.$transaction(async (tx) => {
+        await tx.order.update({
+          where: { id: order.id },
+          data: {
+            status: 'CANCELLED',
+            paymentStatus: wasPaid ? 'REFUNDED' : 'CANCELLED'
+          }
+        });
+
+        // Restore stock
+        for (const item of (mainOrder.items || [])) {
+          if (item.productId && item.quantity) {
+            try {
+              await tx.product.update({
+                where: { id: item.productId },
+                data: { stock: { increment: item.quantity } }
+              });
+            } catch (_) {}
+          }
+        }
+
+        // Add tracking event
+        await tx.trackingEvent.create({
+          data: {
+            orderId: order.id,
+            status: 'CANCELLED',
+            location: 'Platform Escrow Protection',
+            description: `Order cancelled by ${actorId}. Reason: ${reason || 'Customer requested'}.${wasPaid ? ' Escrow refund initiated.' : ''}`
+          }
+        });
+
+        // Update escrow payment if exists
+        await tx.escrowPayment.updateMany({
+          where: { orderId: order.id },
+          data: { status: 'REFUNDED', refundedAt: new Date() }
+        });
+      });
+
+      // Refund held funds via escrowLedgerService if applicable
+      if (wasPaid) {
+        try {
+          const escrowLedgerService = require('../escrowLedgerService');
+          await escrowLedgerService.refundBuyer({ orderId: order.id, buyerId: order.userId || mainOrder.buyerId });
+        } catch (err) {
+          logger.warn(`[PayAI:OrderService] Escrow refundBuyer note for main order ${order.id}: ${err.message}`);
+        }
+      }
+
+      // Notify seller
+      if (mainOrder.sellerId) {
+        try {
+          const notificationV2Service = require('../notificationV2Service');
+          await notificationV2Service.notify(mainOrder.sellerId, {
+            type: 'ORDER_CANCELLED',
+            title: `Order Cancelled: #${order.orderNumber}`,
+            body: `The buyer cancelled order #${order.orderNumber}. Reason: ${reason || 'Customer requested'}.`,
+            orderId: order.id,
+            actionUrl: `/seller/orders/${order.id}`
+          });
+        } catch (e) {
+          logger.warn(`[PayAI:OrderService] Failed to notify seller of main order cancellation: ${e.message}`);
+        }
+      }
+
+      // Emit order update event
+      try {
+        require('../orderEventService').emitOrderUpdated({
+          orderId: order.id,
+          buyerId: order.userId || mainOrder.buyerId,
+          sellerIds: mainOrder.sellerId ? [mainOrder.sellerId] : []
+        });
+      } catch (_) {}
+
+      return {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        fulfillmentStatus: 'CANCELLED',
+        paymentStatus: wasPaid ? 'REFUNDED' : 'CANCELLED',
+        refundIssued: wasPaid,
+        refundPending: false,
+        refundAmount: wasPaid ? Number(order.grandTotal) : 0,
+        currency: order.currency || 'NGN',
+        message: `Order #${order.orderNumber} has been cancelled.${wasPaid ? ' Your payment has been refunded to your original payment funding source.' : ''}`
+      };
+    }
+
     // Read seller's return/cancellation policy from store.portfolioConfig
     const policy = await this.getOrderSellerPolicy(order);
     const windowHours = policy.cancellationWindowHours ?? 24;
@@ -1888,7 +1990,7 @@ class PayAIOrderService {
     const order = await this.getOrder(orderId);
     if (!order) throw new Error('Order not found');
 
-    if (order.source === 'MARKETPLACE') {
+    if (order.source === 'MARKETPLACE' || order.source === 'MAIN_ORDER') {
       throw new Error(`Order #${order.orderNumber} was placed through the W-Commerce cart. Please open the order from your Orders page and use "Report a problem" to start a return or dispute with the seller.`);
     }
 

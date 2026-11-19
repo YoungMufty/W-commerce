@@ -18,7 +18,14 @@ const cacheMiddleware = (durationSeconds = 60) => {
         const key = `cache:${req.originalUrl || req.url}`;
 
         try {
-            const cachedData = await redisManager.get(key);
+            // Fast cache retrieval with timeout protection (max 1000ms)
+            const cachedData = await Promise.race([
+                redisManager.get(key),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Cache get timeout')), 1000))
+            ]).catch(err => {
+                logger.debug('Cache get skipped: ' + err.message);
+                return null;
+            });
             
             if (cachedData) {
                 try {

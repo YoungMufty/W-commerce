@@ -16,6 +16,7 @@ import {
 } from '../components/home/DiscoverySections';
 import BuyProductAgain from '../components/home/BuyProductAgain';
 import { offlineStorage } from '../offline/offlineStorage';
+import { STARTER_PRODUCTS, CURATED_STARTER_DROPS } from '../data/starterDrops';
 
 // Generate a unique vivid gradient from a store ID string
 const storeGradient = (id = '') => {
@@ -53,84 +54,125 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const fetchHomeData = async () => {
-      setIsLoaded(false);
-      try {
-        const res = await axios.get('/api/v1/products?limit=24&page=1');
-        if (res.data) {
-          const fetchedProducts = res.data.data || res.data.products || (Array.isArray(res.data) ? res.data : []);
-          
-          // Deduplicate products by id and randomize
-          const uniqueProducts = [];
-          const seenProductIds = new Set();
-          for (const p of fetchedProducts) {
-             if (!seenProductIds.has(p.id)) {
-                 seenProductIds.add(p.id);
-                 uniqueProducts.push(p);
-             }
-          }
-          
-          const mapped = uniqueProducts.map(p => ({
-            ...p,
-            coverUrl: p.images?.[0]?.url || PLACEHOLDER_IMAGE,
-            price: p.price || 0,
-            title: p.title || p.name || 'Product',
-          }));
-          
-          // Fisher-Yates shuffle
-          const shuffle = (array) => {
-            const arr = [...array];
-            for (let i = arr.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
-              [arr[j], arr[i]] = [arr[i], arr[j]];
-            }
-            return arr;
+    let isMounted = true;
+
+    // Fisher-Yates shuffle
+    const shuffle = (array) => {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[j], arr[i]] = [arr[i], arr[j]];
+      }
+      return arr;
+    };
+
+    const mapProducts = (rawProducts) => {
+      const unique = [];
+      const seenIds = new Set();
+      for (const p of rawProducts) {
+        if (p && p.id && !seenIds.has(p.id)) {
+          seenIds.add(p.id);
+          unique.push(p);
+        }
+      }
+
+      return unique.map(p => ({
+        ...p,
+        coverUrl: p.images?.[0]?.url || (typeof p.images?.[0] === 'string' ? p.images[0] : null) || p.imageUrl || p.coverUrl || PLACEHOLDER_IMAGE,
+        price: parseFloat(p.price) || 0,
+        title: p.title || p.name || 'Product',
+      }));
+    };
+
+    const extractStores = (rawProducts) => {
+      const storeMap = {};
+      rawProducts.forEach(p => {
+        if (p && p.store && p.store.id && !storeMap[p.store.id]) {
+          storeMap[p.store.id] = {
+            id: p.store.id,
+            name: p.store.storeName,
+            slug: p.store.portfolioSlug,
+            logoUrl: p.store.logoUrl,
+            logoLetter: p.store.storeName?.[0] || '?',
+            bannerUrl: p.store.bannerUrl,
+            country: p.store.country,
+            averageRating: p.store.averageRating || 0,
           };
-          
-          setProducts(shuffle(mapped));
-          offlineStorage.saveProducts(fetchedProducts);
-          
-          const storeMap = {};
-          fetchedProducts.forEach(p => {
-             if (p.store && !storeMap[p.store.id]) {
-                storeMap[p.store.id] = {
-                   id: p.store.id,
-                   name: p.store.storeName,
-                   slug: p.store.portfolioSlug,
-                   logoUrl: p.store.logoUrl,
-                   logoLetter: p.store.storeName?.[0] || '?',
-                   bannerUrl: p.store.bannerUrl,
-                   country: p.store.country,
-                   averageRating: p.store.averageRating || 0,
-                };
-             }
-          });
-          setStores(shuffle(Object.values(storeMap)));
         }
-      } catch (err) {
-        try {
-          const cached = await offlineStorage.getProducts();
-          if (cached && cached.length > 0) {
-            console.log('[Home] Loaded cached products for offline browsing:', cached.length);
-            const mapped = cached.map(p => ({
-              ...p,
-              coverUrl: p.images?.[0]?.url || p.coverUrl || PLACEHOLDER_IMAGE,
-              price: p.price || 0,
-              title: p.title || p.name || 'Product',
-            }));
-            setProducts(mapped);
-            toast('Offline mode — displaying cached catalog', { icon: '📡' });
-            return;
-          }
-        } catch (cErr) {
-          console.warn('[Home] Offline cache read error:', cErr);
-        }
-        toast.error('Failed to load products');
-      } finally {
-        setIsLoaded(true);
+      });
+      return Object.values(storeMap);
+    };
+
+    const applyProductList = (rawList) => {
+      const mapped = mapProducts(rawList);
+      setProducts(shuffle(mapped));
+      const extractedStores = extractStores(rawList);
+      if (extractedStores.length > 0) {
+        setStores(shuffle(extractedStores));
       }
     };
+
+    const loadFallbackCatalog = async () => {
+      try {
+        const cached = await offlineStorage.getProducts();
+        if (cached && cached.length > 0) {
+          console.info('[Home] Hydrated from offline cache:', cached.length);
+          applyProductList(cached);
+          return;
+        }
+      } catch (cErr) {
+        console.warn('[Home] Offline cache read error:', cErr);
+      }
+
+      // Fall back to curated starter catalog so /shop is NEVER empty or broken
+      console.info('[Home] Hydrating with curated starter catalog');
+      const starterList = (STARTER_PRODUCTS && STARTER_PRODUCTS.length > 0)
+        ? STARTER_PRODUCTS
+        : CURATED_STARTER_DROPS.map(d => d.originalProduct || d);
+      applyProductList(starterList);
+      offlineStorage.saveProducts(starterList);
+    };
+
+    const fetchHomeData = async (retryCount = 0) => {
+      setIsLoaded(false);
+      try {
+        const res = await axios.get('/api/v1/products?limit=24&page=1', { timeout: 6000 });
+        if (!isMounted) return;
+
+        const fetched = res.data?.data || res.data?.products || (Array.isArray(res.data) ? res.data : []);
+        if (Array.isArray(fetched) && fetched.length > 0) {
+          applyProductList(fetched);
+          offlineStorage.saveProducts(fetched);
+          return;
+        }
+
+        // Backend returned 0 products (e.g. fresh DB), fallback to curated starter drops
+        await loadFallbackCatalog();
+      } catch (err) {
+        console.warn(`[Home] Products API error (attempt ${retryCount + 1}):`, err?.message || err);
+
+        // Single graceful retry after 800ms
+        if (retryCount < 1) {
+          setTimeout(() => {
+            if (isMounted) fetchHomeData(retryCount + 1);
+          }, 800);
+          return;
+        }
+
+        if (!isMounted) return;
+        await loadFallbackCatalog();
+      } finally {
+        if (isMounted) {
+          setIsLoaded(true);
+        }
+      }
+    };
+
     fetchHomeData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (

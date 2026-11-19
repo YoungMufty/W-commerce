@@ -126,50 +126,83 @@ const Feed = () => {
           return;
         }
 
+        let endpointFeed = '';
         let endpointTrend = '';
         let endpointAll = '';
 
         if (searchQuery) {
+          endpointFeed = `/api/v1/feed?limit=30&search=${encodeURIComponent(searchQuery)}`;
           endpointAll = `/api/v1/products?limit=30&sort=newest&search=${encodeURIComponent(searchQuery)}`;
         } else if (effectiveCategory === 'trending') {
+          endpointFeed = '/api/v1/feed?limit=30&category=trending';
           endpointTrend = '/api/v1/products/trending?limit=30';
         } else if (effectiveCategory && effectiveCategory !== 'foryou') {
-          // For specific categories like 'fashion', 'electronics'
-          // We must exact match or partial match on category on backend
+          // For specific categories like 'fashion', 'electronics', 'food'
+          endpointFeed = `/api/v1/feed?limit=30&category=${encodeURIComponent(effectiveCategory)}`;
           endpointAll = `/api/v1/products?limit=30&sort=newest&category=${encodeURIComponent(effectiveCategory)}`;
         } else {
-          // Default: foryou (fetch both)
-          endpointTrend = '/api/v1/products/trending?limit=10';
+          // Default: foryou (fetch feed and trending)
+          endpointFeed = '/api/v1/feed?limit=30';
+          endpointTrend = '/api/v1/products/trending?limit=15';
           endpointAll = '/api/v1/products?limit=30&sort=newest';
         }
 
         const requests = [];
         const requestTypes = [];
-        if (endpointAll) { requests.push(axios.get(endpointAll)); requestTypes.push('all'); }
+        if (endpointFeed) { requests.push(axios.get(endpointFeed)); requestTypes.push('feed'); }
         if (endpointTrend) { requests.push(axios.get(endpointTrend)); requestTypes.push('trend'); }
+        if (endpointAll) { requests.push(axios.get(endpointAll)); requestTypes.push('all'); }
 
         const results = await Promise.allSettled(requests);
         
         let products = [];
+        const existingIds = new Set();
 
-        // Prefer trending if it exists
-        const trendIdx = requestTypes.indexOf('trend');
-        if (trendIdx !== -1) {
-          const res = results[trendIdx];
-          if (res.status === 'fulfilled' && res.value.data.success) {
-            products = res.value.data.products || res.value.data.data || [];
+        // 1. Process /feed endpoint response
+        const feedIdx = requestTypes.indexOf('feed');
+        if (feedIdx !== -1) {
+          const res = results[feedIdx];
+          if (res.status === 'fulfilled' && res.value.data?.success) {
+            const feedProds = res.value.data.products || res.value.data.feed || res.value.data.data || [];
+            feedProds.forEach(p => {
+              const pid = p.id || p._id;
+              if (pid && !existingIds.has(pid)) {
+                existingIds.add(pid);
+                products.push(p);
+              }
+            });
           }
         }
 
-        // Fill up from all products
+        // 2. Merge trending products
+        const trendIdx = requestTypes.indexOf('trend');
+        if (trendIdx !== -1) {
+          const res = results[trendIdx];
+          if (res.status === 'fulfilled' && res.value.data?.success) {
+            const trendProds = res.value.data.products || res.value.data.data || [];
+            trendProds.forEach(p => {
+              const pid = p.id || p._id;
+              if (pid && !existingIds.has(pid)) {
+                existingIds.add(pid);
+                products.push(p);
+              }
+            });
+          }
+        }
+
+        // 3. Merge remaining catalog products
         const allIdx = requestTypes.indexOf('all');
         if (allIdx !== -1) {
           const res = results[allIdx];
-          if (res.status === 'fulfilled' && res.value.data.success) {
+          if (res.status === 'fulfilled' && res.value.data?.success) {
             const allProds = res.value.data.data || res.value.data.products || [];
-            // Merge, avoiding duplicates
-            const existingIds = new Set(products.map(p => p.id));
-            allProds.forEach(p => { if (!existingIds.has(p.id)) products.push(p); });
+            allProds.forEach(p => {
+              const pid = p.id || p._id;
+              if (pid && !existingIds.has(pid)) {
+                existingIds.add(pid);
+                products.push(p);
+              }
+            });
           }
         }
 
@@ -187,6 +220,11 @@ const Feed = () => {
               time:            product.isFlashSale ? '🔥 Flash Deal' : 'Just Dropped',
               text:            product.description?.slice(0, 110) || `${product.title} — Premium quality, limited stock!`,
               image:           optimizeImageUrl(primaryImg),
+              promoTitle:      product.isFlashSale ? `🔥 FLASH SALE: ${product.title}` : null,
+              promoType:       product.isFlashSale ? 'FLASH_DEAL' : null,
+              isFlashSale:     !!product.isFlashSale,
+              discount:        product.discount || product.discountPercentage || 0,
+              dealPrice:       product.dealPrice || product.price,
               audioUrl:        product.audioUrl || product.audio || null,
               audioTitle:      product.audioTitle || null,
               likes:           product.viewCount || 0,
@@ -194,18 +232,26 @@ const Feed = () => {
               originalProduct: product,
             };
           });
-          for (let i = mapped.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [mapped[i], mapped[j]] = [mapped[j], mapped[i]];
+
+          if (mapped.length > 0) {
+            for (let i = mapped.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [mapped[i], mapped[j]] = [mapped[j], mapped[i]];
+            }
+            setPosts(mapped);
+          } else {
+            const starter = getFilteredStarterDrops(effectiveCategory, searchQuery);
+            setPosts(starter.length > 0 ? starter : CURATED_STARTER_DROPS);
           }
-          setPosts(mapped);
         } else {
           // Curated starter drops ensure feed is lively even if DB is initial or unseeded
-          setPosts(getFilteredStarterDrops(effectiveCategory, searchQuery));
+          const starter = getFilteredStarterDrops(effectiveCategory, searchQuery);
+          setPosts(starter.length > 0 ? starter : CURATED_STARTER_DROPS);
         }
       } catch (err) {
         // On API error — gracefully display curated starter drops
-        setPosts(getFilteredStarterDrops(effectiveCategory, searchQuery));
+        const starter = getFilteredStarterDrops(effectiveCategory, searchQuery);
+        setPosts(starter.length > 0 ? starter : CURATED_STARTER_DROPS);
       } finally {
         setLoading(false);
       }
@@ -237,7 +283,7 @@ const Feed = () => {
   return (
     <div className="w-full h-[calc(100vh-64px)] bg-[var(--bg-primary)] overflow-hidden relative">
       {/* TikTok-style Categories Bar */}
-      <div className="absolute top-0 left-0 right-0 z-[50] flex justify-center items-center pt-4 pb-10 pointer-events-none lg:pl-[300px] gap-3 px-4 bg-gradient-to-b from-black/60 via-black/20 to-transparent">
+      <div className="absolute top-0 left-0 right-0 z-[50] flex justify-center items-center pt-3 sm:pt-4 pb-8 sm:pb-10 pointer-events-none lg:pl-[300px] gap-2 sm:gap-3 px-2 sm:px-4 bg-gradient-to-b from-black/60 via-black/20 to-transparent">
          {/* Promotion Button */}
          <div className="pointer-events-auto shrink-0 relative z-50">
             <button onClick={() => {
@@ -245,13 +291,13 @@ const Feed = () => {
               const newParams = new URLSearchParams(searchParams);
               newParams.set('category', 'promotions');
               setSearchParams(newParams);
-            }} className="w-10 h-10 rounded-full bg-black/30 dark:bg-black/40 backdrop-blur-xl flex items-center justify-center text-white hover:bg-black/50 transition-colors border border-white/20 shadow-xl" title="Daily Promotions">
+            }} className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/30 dark:bg-black/40 backdrop-blur-xl flex items-center justify-center text-white hover:bg-black/50 transition-colors border border-white/20 shadow-xl" title="Daily Promotions">
               <Sparkles size={18} strokeWidth={2.5} className="text-amber-400" />
             </button>
          </div>
 
-         <div className="flex gap-2 pointer-events-auto max-w-full overflow-x-auto hide-scrollbar px-3 py-1.5 items-center bg-black/30 dark:bg-black/40 backdrop-blur-xl rounded-full border border-white/20 shadow-2xl">
-            {['For You', 'Trending', 'Fashion', 'Electronics'].map(cat => {
+         <div className="flex gap-1.5 sm:gap-2 pointer-events-auto max-w-full overflow-x-auto hide-scrollbar px-2 sm:px-3 py-1 sm:py-1.5 items-center bg-black/30 dark:bg-black/40 backdrop-blur-xl rounded-full border border-white/20 shadow-2xl">
+            {['For You', 'Trending', 'Fashion', 'Electronics', 'Food'].map(cat => {
               const catKey = cat.toLowerCase().replace(' ', '');
               const isActive = effectiveCategory === catKey || (effectiveCategory === '' && catKey === 'foryou');
               return (
@@ -264,7 +310,7 @@ const Feed = () => {
                     else newParams.set('category', catKey);
                     setSearchParams(newParams);
                   }}
-                  className={`text-xs md:text-sm font-black px-3.5 py-1.5 rounded-full transition-all ${isActive ? 'bg-white text-black shadow-md scale-105' : 'text-white/80 hover:text-white hover:bg-white/10'}`}
+                  className={`text-xs md:text-sm font-black px-3 sm:px-3.5 py-1 sm:py-1.5 rounded-full transition-all whitespace-nowrap ${isActive ? 'bg-white text-black shadow-md scale-105' : 'text-white/80 hover:text-white hover:bg-white/10'}`}
                >
                  {cat}
                </button>
@@ -274,7 +320,7 @@ const Feed = () => {
 
          {/* Search Button */}
          <div className="pointer-events-auto shrink-0 relative z-50">
-            <button onClick={() => { setShowSearch(!showSearch); setShowFilter(false); }} className="w-10 h-10 rounded-full bg-black/30 dark:bg-black/40 backdrop-blur-xl flex items-center justify-center text-white hover:bg-black/50 transition-colors border border-white/20 shadow-xl">
+            <button onClick={() => { setShowSearch(!showSearch); setShowFilter(false); }} className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/30 dark:bg-black/40 backdrop-blur-xl flex items-center justify-center text-white hover:bg-black/50 transition-colors border border-white/20 shadow-xl">
               <Search size={18} strokeWidth={2.5} />
             </button>
             <AnimatePresence>
@@ -292,23 +338,33 @@ const Feed = () => {
           <WFetchingAnimation message={searchQuery ? "Searching global catalog..." : "Fetching your feed..."} />
         </div>
       ) : posts.length === 0 ? (
-        <div className="w-full h-full flex justify-center items-center bg-[var(--bg-primary)] p-6">
-          <WEmptyState 
-            icon={Sparkles}
-            title="No Drops Found" 
-            message="No active drops matched your search. Tap below to discover our curated starter drops." 
-            actionLabel="Discover Curated Drops" 
-            onAction={() => {
-              setActiveCategory('foryou');
-              setLocalSearch('');
-              const newParams = new URLSearchParams(searchParams);
-              newParams.delete('search');
-              newParams.delete('category');
-              setSearchParams(newParams);
-              setPosts(CURATED_STARTER_DROPS);
-            }} 
+        searchQuery ? (
+          <div className="w-full h-full flex justify-center items-center bg-[var(--bg-primary)] p-6">
+            <WEmptyState 
+              icon={Sparkles}
+              title="No Drops Found" 
+              message="No active drops matched your search. Tap below to discover our curated starter drops." 
+              actionLabel="Discover Curated Drops" 
+              onAction={() => {
+                setActiveCategory('foryou');
+                setLocalSearch('');
+                const newParams = new URLSearchParams(searchParams);
+                newParams.delete('search');
+                newParams.delete('category');
+                setSearchParams(newParams);
+                setPosts(CURATED_STARTER_DROPS);
+              }} 
+            />
+          </div>
+        ) : (
+          <FeedImmersiveViewer 
+            posts={CURATED_STARTER_DROPS}
+            initialIndex={0}
+            onClose={() => {}} 
+            onAddToCart={handleAddToCart}
+            asMainFeed={true}
           />
-        </div>
+        )
       ) : (
         <FeedImmersiveViewer 
           posts={posts}
@@ -320,7 +376,7 @@ const Feed = () => {
       )}
       
       {/* Glowing Black Gradient at the bottom */}
-      <div className="absolute bottom-0 left-0 right-0 h-40 pointer-events-none bg-gradient-to-t from-black via-black/50 to-transparent z-[40]" />
+      <div className="absolute bottom-0 left-0 right-0 h-40 pointer-events-none bg-gradient-to-t from-black via-black/50 to-transparent z-[10]" />
     </div>
   );
 };

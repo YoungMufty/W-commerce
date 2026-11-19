@@ -4,7 +4,19 @@
  */
 
 const { z } = require('zod');
-const DOMPurify = require('isomorphic-dompurify');
+
+// Fast XSS sanitizer without the 25-second JSDOM cold start penalty
+const sanitizeString = (str) => {
+    if (typeof str !== 'string' || (!str.includes('<') && !str.includes('javascript:'))) {
+        return str;
+    }
+    return str
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+        .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+        .replace(/on\w+\s*=\s*(["'][^"']*["']|[^\s>]+)/gi, '')
+        .replace(/javascript\s*:/gi, '')
+        .replace(/<[^>]+>/g, '');
+};
 
 // Common validation schemas
 const schemas = {

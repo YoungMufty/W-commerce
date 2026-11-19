@@ -6,6 +6,51 @@
 
 export const CURATED_STARTER_DROPS = [
   {
+    id: 'starter-drop-kalid-01',
+    sellerId: 'starter-seller-kalid',
+    storeSlug: 'tirimisiyu-kalid-shop',
+    storeId: 'starter-store-kalid-01',
+    seller: "TIRIMISIYU KALID's Shop",
+    avatar: 'T',
+    time: '🔥 Hot & Fresh',
+    text: 'Ten freshly prepared crispy chicken breast strips served with four sauces — Golden, crunchy, and seasoned with our secret spice blend.',
+    image: 'https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1000&q=80',
+    promoTitle: 'SPECIAL DEAL: ₦10,000 Crispy Strips Feast',
+    promoType: 'FESTIVAL_PROMO',
+    isFlashSale: false,
+    discount: 0,
+    dealPrice: 10000,
+    audioUrl: null,
+    audioTitle: null,
+    likes: 4890,
+    comments: 72,
+    category: 'food',
+    originalProduct: {
+      id: 'starter-food-chicken-strips-01',
+      title: 'Ten freshly prepared crispy chicken breast strips served with four sauces',
+      description: 'Ten freshly prepared crispy chicken breast strips served with four signature dipping sauces. Golden-fried to crunchy perfection from premium farm-fresh poultry.',
+      price: 10000,
+      shippingFee: 1500,
+      stock: 50,
+      category: 'Food',
+      subCategory: 'Fast Food & Dining',
+      tags: 'food, chicken, crispy, fast food, dining, strips, meals, sauces, poultry',
+      images: [
+        { id: 'img-chick-1', url: 'https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1000&q=80', isPrimary: true }
+      ],
+      imageUrl: 'https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=1000&q=80',
+      store: {
+        id: 'starter-store-kalid-01',
+        sellerId: 'starter-seller-kalid',
+        storeName: "TIRIMISIYU KALID's Shop",
+        portfolioSlug: 'tirimisiyu-kalid-shop',
+        isVerified: true,
+        approvalStatus: 'APPROVED'
+      },
+      _count: { reviews: 72 }
+    }
+  },
+  {
     id: 'starter-drop-01',
     sellerId: 'starter-seller-aura',
     storeSlug: 'aura-sound-lab',
@@ -34,8 +79,9 @@ export const CURATED_STARTER_DROPS = [
       stock: 45,
       category: 'Electronics',
       subCategory: 'Audio & Tech',
+      tags: 'electronics, audio, headphones, anc, wireless, gadgets',
       images: [
-        { url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1000&q=80' }
+        { id: 'img-audio-1', url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1000&q=80', isPrimary: true }
       ],
       imageUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1000&q=80',
       store: {
@@ -43,9 +89,98 @@ export const CURATED_STARTER_DROPS = [
         sellerId: 'starter-seller-aura',
         storeName: 'Aura Sound Lab',
         portfolioSlug: 'aura-sound-lab',
-        isVerified: true
+        isVerified: true,
+        approvalStatus: 'APPROVED'
       },
       _count: { reviews: 48 }
+    }
+  },
+  {
+    id: 'starter-drop-luxe-01',
+    sellerId: 'starter-seller-luxe',
+    storeSlug: 'luxe-timepieces',
+    storeId: 'starter-store-luxe-01',
+    seller: 'Luxe Timepieces',
+    avatar: 'L',
+    time: '🔥 Flash Deal',
+    text: 'Samsung Galaxy Watch Ultra Titanium Smartwatch — Super AMOLED display, sapphire crystal & military-grade resilience.',
+    image: 'https://images.unsplash.com/photo-1579586337278-3befd40fd17a?auto=format&fit=crop&w=1000&q=80',
+    promoTitle: 'FLASH DEAL: Galaxy Watch Ultra Edition',
+    promoType: 'FLASH_DEAL',
+    isFlashSale: true,
+    discount: 17,
+    dealPrice: 249.99,
+    audioUrl: null,
+    audioTitle: null,
+    likes: 4120,
+    comments: 56,
+    category: 'electronics',
+    originalProduct: {
+      id: 'starter-watch-galaxy-01',
+      title: 'Samsung Galaxy Watch Ultra Titanium Edition',
+      description: 'Super AMOLED display, aerospace-grade titanium casing, dual-frequency GPS, 100m water resistance, and advanced wellness biometric sensor suite.',
+      price: 299.99,
+      shippingFee: 0,
+      stock: 25,
+      category: 'Electronics',
+      subCategory: 'Wearables & Smartwatches',
+      tags: 'smartwatch, watch, galaxy, samsung, electronics, luxury, wearables, fitness',
+      images: [
+        { id: 'img-gw-1', url: 'https://images.unsplash.com/photo-1579586337278-3befd40fd17a?auto=format&fit=crop&w=1000&q=80', isPrimary: true }
+      ],
+      imageUrl: 'https://images.unsplash.com/photo-1579586337278-3befd40fd17a?auto=format&fit=crop&w=1000&q=80',
+      store: {
+        id: 'starter-store-luxe-01',
+        sellerId: 'starter-seller-luxe',
+        storeName: 'Luxe Timepieces',
+        portfolioSlug: 'luxe-timepieces',
+        isVerified: true,
+        approvalStatus: 'APPROVED'
+      },
+      _count: { reviews: 56 }
+    }
+  },
+  {
+    id: 'starter-drop-solis-01',
+    sellerId: 'starter-seller-solis-street',
+    storeSlug: 'solis-streetwear',
+    storeId: 'starter-store-solis-02',
+    seller: 'Solis Streetwear',
+    avatar: 'S',
+    time: 'Just Dropped',
+    text: 'Solis Cyber Heavyweight Graphic Tee — 300GSM custom combed organic cotton with high-density puff print detailing.',
+    image: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=80',
+    isFlashSale: false,
+    discount: 0,
+    dealPrice: 65.00,
+    audioUrl: null,
+    audioTitle: null,
+    likes: 3450,
+    comments: 41,
+    category: 'fashion',
+    originalProduct: {
+      id: 'starter-streetwear-solis-tee-01',
+      title: 'Solis Cyber Heavyweight Graphic Tee',
+      description: 'Crafted from 300GSM custom combed organic cotton with high-density puff print detailing and relaxed dropped-shoulder silhouette.',
+      price: 65.00,
+      shippingFee: 0,
+      stock: 60,
+      category: 'Fashion',
+      subCategory: 'Streetwear & Apparel',
+      tags: 'fashion, streetwear, tee, clothing, solis, apparel, oversized, shirt',
+      images: [
+        { id: 'img-solis-1', url: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=80', isPrimary: true }
+      ],
+      imageUrl: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=80',
+      store: {
+        id: 'starter-store-solis-02',
+        sellerId: 'starter-seller-solis-street',
+        storeName: 'Solis Streetwear',
+        portfolioSlug: 'solis-streetwear',
+        isVerified: true,
+        approvalStatus: 'APPROVED'
+      },
+      _count: { reviews: 41 }
     }
   },
   {
@@ -75,8 +210,9 @@ export const CURATED_STARTER_DROPS = [
       stock: 22,
       category: 'Fashion',
       subCategory: 'Footwear & Streetwear',
+      tags: 'sneakers, shoes, kicks, fashion, streetwear, tokyo',
       images: [
-        { url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1000&q=80' }
+        { id: 'img-snk-1', url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1000&q=80', isPrimary: true }
       ],
       imageUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1000&q=80',
       store: {
@@ -84,7 +220,8 @@ export const CURATED_STARTER_DROPS = [
         sellerId: 'starter-seller-kuro',
         storeName: 'Kuro Studio',
         portfolioSlug: 'kuro-studio',
-        isVerified: true
+        isVerified: true,
+        approvalStatus: 'APPROVED'
       },
       _count: { reviews: 86 }
     }
@@ -118,8 +255,9 @@ export const CURATED_STARTER_DROPS = [
       stock: 35,
       category: 'Fashion',
       subCategory: 'Apparel',
+      tags: 'fashion, hoodie, streetwear, apparel, cotton, clothing',
       images: [
-        { url: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=1000&q=80' }
+        { id: 'img-hoodie-1', url: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=1000&q=80', isPrimary: true }
       ],
       imageUrl: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=1000&q=80',
       store: {
@@ -127,7 +265,8 @@ export const CURATED_STARTER_DROPS = [
         sellerId: 'starter-seller-kuro',
         storeName: 'Kuro Studio',
         portfolioSlug: 'kuro-studio',
-        isVerified: true
+        isVerified: true,
+        approvalStatus: 'APPROVED'
       },
       _count: { reviews: 62 }
     }
@@ -159,8 +298,9 @@ export const CURATED_STARTER_DROPS = [
       stock: 14,
       category: 'Fashion',
       subCategory: 'Luxury & Accessories',
+      tags: 'fashion, watch, timepiece, luxury, accessories, steel',
       images: [
-        { url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1000&q=80' }
+        { id: 'img-wtc-1', url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1000&q=80', isPrimary: true }
       ],
       imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1000&q=80',
       store: {
@@ -168,7 +308,8 @@ export const CURATED_STARTER_DROPS = [
         sellerId: 'starter-seller-chronos',
         storeName: 'Chronos Horology',
         portfolioSlug: 'chronos-horology',
-        isVerified: true
+        isVerified: true,
+        approvalStatus: 'APPROVED'
       },
       _count: { reviews: 39 }
     }
@@ -202,8 +343,9 @@ export const CURATED_STARTER_DROPS = [
       stock: 28,
       category: 'Electronics',
       subCategory: 'Gaming Gear',
+      tags: 'electronics, keyboard, mechanical, rgb, desk, gaming',
       images: [
-        { url: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=1000&q=80' }
+        { id: 'img-kb-1', url: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=1000&q=80', isPrimary: true }
       ],
       imageUrl: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=1000&q=80',
       store: {
@@ -211,7 +353,8 @@ export const CURATED_STARTER_DROPS = [
         sellerId: 'starter-seller-volt',
         storeName: 'VoltTech Labs',
         portfolioSlug: 'volttech-labs',
-        isVerified: true
+        isVerified: true,
+        approvalStatus: 'APPROVED'
       },
       _count: { reviews: 54 }
     }
@@ -245,8 +388,9 @@ export const CURATED_STARTER_DROPS = [
       stock: 55,
       category: 'Electronics',
       subCategory: 'Tech Accessories',
+      tags: 'electronics, charger, gan, power, tech, usbc',
       images: [
-        { url: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=1000&q=80' }
+        { id: 'img-chg-1', url: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=1000&q=80', isPrimary: true }
       ],
       imageUrl: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=1000&q=80',
       store: {
@@ -254,12 +398,101 @@ export const CURATED_STARTER_DROPS = [
         sellerId: 'starter-seller-volt',
         storeName: 'VoltTech Labs',
         portfolioSlug: 'volttech-labs',
-        isVerified: true
+        isVerified: true,
+        approvalStatus: 'APPROVED'
       },
       _count: { reviews: 42 }
     }
+  },
+  {
+    id: 'starter-drop-07',
+    sellerId: 'starter-seller-kuro',
+    storeSlug: 'kuro-studio',
+    storeId: 'starter-store-kuro-02',
+    seller: 'Kuro Studio',
+    avatar: 'K',
+    time: 'Featured Pack',
+    text: 'Nomad Weatherproof Magnetic Commuter Pack — Cordura 1000D ballistic nylon with Fidlock magnetic buckle systems & 16-inch laptop chamber.',
+    image: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=1000&q=80',
+    isFlashSale: false,
+    discount: 0,
+    dealPrice: 135.00,
+    audioUrl: null,
+    audioTitle: null,
+    likes: 2280,
+    comments: 31,
+    category: 'fashion',
+    originalProduct: {
+      id: 'starter-gear-backpack-06',
+      title: 'Nomad Weatherproof Magnetic Commuter Pack',
+      description: 'Engineered from Cordura 1000D ballistic nylon with Fidlock magnetic buckle systems, padded 16-inch laptop chamber, and TSA-ready lay-flat design.',
+      price: 135.00,
+      shippingFee: 0,
+      stock: 40,
+      category: 'Fashion',
+      subCategory: 'Gear & Bags',
+      tags: 'fashion, backpack, bag, commuter, travel, waterproof, gear',
+      images: [
+        { id: 'img-bag-1', url: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=1000&q=80', isPrimary: true }
+      ],
+      imageUrl: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=1000&q=80',
+      store: {
+        id: 'starter-store-kuro-02',
+        sellerId: 'starter-seller-kuro',
+        storeName: 'Kuro Studio',
+        portfolioSlug: 'kuro-studio',
+        isVerified: true,
+        approvalStatus: 'APPROVED'
+      },
+      _count: { reviews: 31 }
+    }
+  },
+  {
+    id: 'starter-drop-08',
+    sellerId: 'starter-seller-aura',
+    storeSlug: 'aura-sound-lab',
+    storeId: 'starter-store-aura-01',
+    seller: 'Aura Sound Lab',
+    avatar: 'A',
+    time: 'Studio Pro',
+    text: 'Quantum Studio Broadcast Condenser Mic — Cardioid polar pattern tuned for rich vocal warmth & zero-latency hardware monitoring.',
+    image: 'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=1000&q=80',
+    isFlashSale: false,
+    discount: 0,
+    dealPrice: 169.00,
+    audioUrl: null,
+    audioTitle: null,
+    likes: 1940,
+    comments: 27,
+    category: 'electronics',
+    originalProduct: {
+      id: 'starter-audio-mic-08',
+      title: 'Quantum Studio Broadcast Condenser Mic',
+      description: 'Cardioid polar pattern condenser capsule tuned specifically for rich vocal warmth, background ambient rejection, and zero-latency hardware monitoring.',
+      price: 169.00,
+      shippingFee: 0,
+      stock: 19,
+      category: 'Electronics',
+      subCategory: 'Audio Gear',
+      tags: 'electronics, microphone, studio, audio, podcast, streaming',
+      images: [
+        { id: 'img-mic-1', url: 'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=1000&q=80', isPrimary: true }
+      ],
+      imageUrl: 'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=1000&q=80',
+      store: {
+        id: 'starter-store-aura-01',
+        sellerId: 'starter-seller-aura',
+        storeName: 'Aura Sound Lab',
+        portfolioSlug: 'aura-sound-lab',
+        isVerified: true,
+        approvalStatus: 'APPROVED'
+      },
+      _count: { reviews: 27 }
+    }
   }
 ];
+
+export const STARTER_PRODUCTS = CURATED_STARTER_DROPS.map(d => d.originalProduct);
 
 export function getFilteredStarterDrops(category = '', search = '') {
   let drops = [...CURATED_STARTER_DROPS];
@@ -270,15 +503,27 @@ export function getFilteredStarterDrops(category = '', search = '') {
     if (cat === 'promotions') {
       drops = drops.filter(d => d.isFlashSale);
     } else {
-      drops = drops.filter(d => (d.category || '').toLowerCase().includes(cat) || (d.text || '').toLowerCase().includes(cat));
+      drops = drops.filter(d => {
+        const dCat = (d.category || '').toLowerCase();
+        const dText = (d.text || '').toLowerCase();
+        const pTags = (d.originalProduct?.tags || '').toLowerCase();
+        const pSub = (d.originalProduct?.subCategory || '').toLowerCase();
+        return dCat.includes(cat) || dText.includes(cat) || pTags.includes(cat) || pSub.includes(cat);
+      });
     }
   }
 
   if (q) {
-    drops = drops.filter(d => (d.text || '').toLowerCase().includes(q) || (d.seller || '').toLowerCase().includes(q));
+    drops = drops.filter(d => {
+      const dText = (d.text || '').toLowerCase();
+      const dSeller = (d.seller || '').toLowerCase();
+      const pTitle = (d.originalProduct?.title || '').toLowerCase();
+      const pTags = (d.originalProduct?.tags || '').toLowerCase();
+      return dText.includes(q) || dSeller.includes(q) || pTitle.includes(q) || pTags.includes(q);
+    });
   }
 
-  // If specific query yielded 0 results, fall back to the top trending drops so feed is never completely blank
+  // If specific query yielded 0 results, fall back to all drops so feed is never completely blank
   if (drops.length === 0) {
     return CURATED_STARTER_DROPS;
   }
