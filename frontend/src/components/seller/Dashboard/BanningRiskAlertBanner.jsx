@@ -289,20 +289,7 @@ const BanningRiskAlertBanner = ({ setActiveTab }) => {
             </div>
           </div>
 
-          {/* Quick appeal link if store is impacted */}
-          {banningRate > 0 && setActiveTab && (
-            <div className="pt-2 flex items-center justify-between text-xs text-white/70">
-              <span>Believe a penalty was applied in error due to courier delays?</span>
-              <button
-                type="button"
-                onClick={() => setActiveTab('appeal-dispute')}
-                className="text-amber-300 hover:text-white underline font-semibold flex items-center gap-1 cursor-pointer"
-              >
-                <FileText size={13} />
-                <span>Submit Penalty Appeal</span>
-              </button>
-            </div>
-          )}
+
 
         </div>
       )}

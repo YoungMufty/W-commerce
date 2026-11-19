@@ -98,11 +98,7 @@ const DashboardSidebar = ({
               label={tab.label}
               icon={<GXIcon name={tab.iconName} size={14} />}
               onClick={() => { setActiveTab(tab.id); setIsSidebarOpen(false); }}
-              isBlue={
-                activeTab === tab.id ||
-                (tab.id === 'disputes' && activeTab === 'appeal-dispute') ||
-                (tab.id === 'reviews' && activeTab === 'appeal-review')
-              }
+              isBlue={activeTab === tab.id}
             />
           ))}
         </nav>

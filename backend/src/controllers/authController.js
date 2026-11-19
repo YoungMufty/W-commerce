@@ -934,8 +934,10 @@ exports.getMe = async (req, res) => {
     try {
         const user = req.user;
         if (!user) return res.status(401).json({ success: false, message: 'Not authorized' });
+        const token = req.cookies?.token || (req.headers?.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null);
         res.json({
             success: true,
+            token,
             user: {
                 id: user.id,
                 fullName: user.fullName,

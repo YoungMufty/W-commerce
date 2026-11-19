@@ -82,14 +82,20 @@ const SellerDashboard = ({ initialTab }) => {
 
   const getEffectiveTab = useCallback(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam) return tabParam === 'inventory' ? 'products' : tabParam;
-    if (location.pathname.includes('/seller/orders')) return 'orders';
+    if (tabParam) {
+      if (tabParam === 'inventory') return 'products';
+      if (['analytics', 'products', 'settings', 'orders', 'verify', 'performance'].includes(tabParam)) return tabParam;
+    }
+    if (location.pathname.includes('/seller/orders') || location.pathname.includes('/seller/receipt')) return 'orders';
     if (location.pathname.includes('/seller/products') || location.pathname.includes('/seller/inventory')) return 'products';
     if (location.pathname.includes('/seller/analytics')) return 'analytics';
     if (location.pathname.includes('/seller/settings')) return 'settings';
-    if (location.pathname.includes('/seller/external-site')) return 'external-site';
-    if (location.pathname.includes('/seller/negotiate-hub')) return 'negotiate-hub';
-    if (initialTab) return initialTab === 'inventory' ? 'products' : initialTab;
+    if (location.pathname.includes('/seller/verify') || location.pathname.includes('/seller/verification')) return 'verify';
+    if (location.pathname.includes('/seller/performance')) return 'performance';
+    if (initialTab) {
+      const norm = initialTab === 'inventory' ? 'products' : initialTab;
+      if (['analytics', 'products', 'settings', 'orders', 'verify', 'performance'].includes(norm)) return norm;
+    }
     return 'analytics';
   }, [initialTab, searchParams, location.pathname]);
 
@@ -311,40 +317,14 @@ const SellerDashboard = ({ initialTab }) => {
 
   const commerceTabs = [
     { id: 'analytics', label: 'Analytics', iconName: 'seller.analytics' },
-    { id: 'performance', label: 'Performance', iconName: 'seller.performance' },
     { id: 'products', label: 'Inventory', iconName: 'seller.inventory' },
-    { id: 'inventory-alerts', label: 'Alerts', iconName: 'shared.bell' },
-    { id: 'orders', label: 'Orders', iconName: 'seller.orders' },
-    { id: 'active-carts', label: 'Active Carts', iconName: 'seller.orders' },
-    { id: 'couriers', label: 'Find Couriers', iconName: 'seller.logistics' },
-    { id: 'freight-offers', label: 'Freight Offers', iconName: 'seller.logistics' },
-    { id: 'external-site', label: 'External Site', iconName: 'shared.globe' },
-    { id: 'ai-sales-rep', label: 'AI Sales Rep', iconName: 'seller.ai' },
-    { id: 'studio', label: 'Studio', iconName: 'seller.dashboard' },
-    ...(user?.subscriptionTier?.toLowerCase()?.includes('premium') ? [
-      { id: 'design-studio', label: 'Design Studio', iconName: 'seller.palette' },
-      { id: 'ai-assistant', label: 'AI Assistant', iconName: 'seller.ai' }
-    ] : []),
-    { id: 'messages', label: 'Messages', iconName: 'seller.messages' },
+    { id: 'settings', label: 'Settings', iconName: 'seller.settings' },
+    { id: 'orders', label: 'Create Order Receipt', iconName: 'seller.orders' },
     { id: 'verify', label: 'Verification', iconName: 'seller.verification' },
-    { id: 'packing', label: 'Packing', iconName: 'seller.inventory' },
-    { id: 'disputes', label: 'Disputes', iconName: 'seller.verification' },
-    { id: 'buyers', label: 'Buyers', iconName: 'seller.verification' },
-    { id: 'buyer-requests', label: 'Requests', iconName: 'seller.performance' },
-    { id: 'reviews', label: 'Reviews', iconName: 'shared.star' },
-    { id: 'settings', label: 'Settings', iconName: 'seller.settings' },
-    { id: 'payments', label: 'Payouts', iconName: 'seller.wallet' },
-    { id: 'logistics', label: 'Logistics', iconName: 'seller.inventory' },
+    { id: 'performance', label: 'Performance', iconName: 'seller.performance' },
   ];
 
-  const restaurantTabs = [
-    { id: 'kitchen', label: 'Kitchen Display', iconName: 'seller.dashboard' },
-    { id: 'menu', label: 'QR Menu Config', iconName: 'seller.inventory' },
-    { id: 'tables', label: 'Table Booking', iconName: 'seller.orders' },
-    { id: 'settings', label: 'Settings', iconName: 'seller.settings' },
-  ];
-
-  const tabs = activeEngine === 'restaurant' ? restaurantTabs : commerceTabs;
+  const tabs = commerceTabs;
 
   const handleSaveBrandConfig = async () => {
     setIsSavingBrand(true);

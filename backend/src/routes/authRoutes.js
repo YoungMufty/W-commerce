@@ -168,21 +168,24 @@ router.get('/google/callback',
                     return res.redirect(`${frontendUrl}/login?error=google_callback_failed`);
                 }
                 if (!user) {
-                    logger.warn('Google authenticate returned no user');
+                    logger.warn(`Google authenticate returned no user: ${info?.message || info || 'unknown'}`);
                     return res.redirect(`${frontendUrl}/login?error=google_auth_failed`);
                 }
                 req.user = user;
-                next();
-            })(req, res, (err) => {
-                if (err) {
-                    logger.error(`Google authenticate callback dispatch error: ${err.message}`);
-                    return res.redirect(`${frontendUrl}/login?error=google_callback_failed`);
+                return next();
+            })(req, res, (dispatchErr) => {
+                if (dispatchErr) {
+                    logger.error(`Google authenticate callback dispatch error: ${dispatchErr.message}`);
+                    if (!res.headersSent) {
+                        return res.redirect(`${frontendUrl}/login?error=google_callback_failed`);
+                    }
                 }
-                next();
             });
         } catch (err) {
             logger.error(`Google callback catch error: ${err.message}`);
-            return res.redirect(`${frontendUrl}/login?error=google_callback_failed`);
+            if (!res.headersSent) {
+                return res.redirect(`${frontendUrl}/login?error=google_callback_failed`);
+            }
         }
     },
     async (req, res) => {

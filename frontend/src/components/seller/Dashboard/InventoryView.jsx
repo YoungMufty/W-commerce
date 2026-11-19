@@ -190,13 +190,6 @@ const InventoryView = ({ products, setIsAddProductModalOpen, setIsCreateDealModa
             <span>Refresh</span>
           </button>
           <button 
-            onClick={fetchAiInsights}
-            disabled={isLoadingInsight}
-            className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 text-emerald-600 dark:text-emerald-400 px-4 sm:px-5 py-2.5 rounded-xl font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors disabled:opacity-50"
-          >
-            <Sparkles className="w-5 h-5" /> AI Insights
-          </button>
-          <button 
             onClick={() => {
               if (!canAddProduct) {
                 showNotification("Basic plan limit reached (10 max). Upgrade to Premium to add more products.", "error");
@@ -312,32 +305,7 @@ const InventoryView = ({ products, setIsAddProductModalOpen, setIsCreateDealModa
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-800/80 gap-1 flex-wrap">
-                  <div className="flex items-center gap-1">
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); setIsCreateDealModalOpen(true); }} 
-                      className="p-1.5 sm:p-2 text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-500/10 rounded-lg transition-colors cursor-pointer"
-                      title="Promote / Deal"
-                    >
-                      <Tag className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleToggleAdBoost(item.id); }} 
-                      className={`p-1.5 sm:p-2 rounded-lg transition-colors relative cursor-pointer ${item.isAdBoosted ? 'text-amber-500 bg-amber-50 dark:bg-amber-500/10' : 'text-gray-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10'}`}
-                      title={item.isAdBoosted ? "Ad Boost Active (Click to disable)" : "Enable Ad Boost"}
-                    >
-                      <RefreshCw className={`w-4 h-4 animate-spin ${loadingAdBoostId === item.id ? 'block' : 'hidden'}`} />
-                      <Zap className={`w-4 h-4 ${item.isAdBoosted ? 'fill-current' : ''} ${loadingAdBoostId !== item.id ? 'block' : 'hidden'}`} />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); fetchProductAi(item.id); }}
-                      className="p-1.5 sm:p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors relative cursor-pointer"
-                      title="AI Analysis"
-                    >
-                      <RefreshCw className={`w-4 h-4 animate-spin ${loadingProductId === item.id ? 'block' : 'hidden'}`} />
-                      <BarChart2 className={`w-4 h-4 ${loadingProductId !== item.id ? 'block' : 'hidden'}`} />
-                    </button>
-                  </div>
+                <div className="flex items-center justify-end pt-3 border-t border-gray-100 dark:border-gray-800/80 gap-1 flex-wrap">
                   <div className="flex items-center gap-1">
                     <button 
                       onClick={(e) => { e.stopPropagation(); setEditingProduct(item); setIsEditProductModalOpen(true); }} 

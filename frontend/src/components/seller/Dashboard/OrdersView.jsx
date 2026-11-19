@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, MapPin, Package, CheckCircle, XCircle, Clock, ChevronRight, Eye, Send, Truck } from 'lucide-react';
+import { Search, MapPin, Package, CheckCircle, XCircle, Clock, ChevronRight, Eye, Send, Truck, Printer } from 'lucide-react';
 import { getImageUrl } from '../../../utils/imageHelpers';
 import { useSellerStore } from '../../../store/sellerStore';
 import { apiClient as axios } from '@/utils/apiClient';
+import PrintableReceiptModal from '../../buyer/PrintableReceiptModal';
 
 const OrdersView = ({ orders, storeConfig, setPackingOrder, setShippingOrder, approvePaymentProof, rejectPaymentProof, showNotification }) => {
   const [rejectOrderId, setRejectOrderId] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [viewProofUrl, setViewProofUrl] = useState(null);
   const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
+  const [receiptOrder, setReceiptOrder] = useState(null);
   const [isRejecting, setIsRejecting] = useState(false);
   const [isRequestingAddress, setIsRequestingAddress] = useState(false);
   const [rateOrderId, setRateOrderId] = useState(null);
@@ -81,8 +83,8 @@ const OrdersView = ({ orders, storeConfig, setPackingOrder, setShippingOrder, ap
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black text-[var(--text-main)] mb-2 tracking-tight">Sales Orders</h1>
-          <p className="text-[var(--text-muted)] text-sm font-medium">Manage and fulfill your customer orders.</p>
+          <h1 className="text-2xl md:text-3xl font-black text-[var(--text-main)] mb-2 tracking-tight">Create Order Receipt</h1>
+          <p className="text-[var(--text-muted)] text-sm font-medium">Create and print official order receipts and fulfill customer orders.</p>
         </div>
         <div className="relative w-full md:w-72">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -237,27 +239,25 @@ const OrdersView = ({ orders, storeConfig, setPackingOrder, setShippingOrder, ap
                       <Truck className="w-4 h-4" /> Handover to Courier
                     </button>
                   ) : ['HANDED_TO_COURIER', 'SHIPPED', 'DELIVERED', 'COMPLETED'].includes(order.status) ? (
-                    <div className="flex flex-col gap-2 w-full">
-                      <div className="w-full flex items-center justify-center gap-2 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 py-3 rounded-xl text-sm font-bold cursor-default border border-emerald-500/25">
-                        <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> {order.status === 'DELIVERED' || order.status === 'COMPLETED' ? 'Delivered' : 'In Transit'}
-                      </div>
-                      {(order.status === 'DELIVERED' || order.status === 'COMPLETED') && order.deliveryAssignment && !order.deliveryAssignment.courierReview && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setRateOrderId(order.id);
-                          }}
-                          className="w-full flex items-center justify-center gap-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-700 dark:text-yellow-400 py-2.5 rounded-xl text-sm font-bold transition-colors border border-yellow-500/30"
-                        >
-                          ⭐ Rate Courier
-                        </button>
-                      )}
+                    <div className="w-full flex items-center justify-center gap-2 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 py-3 rounded-xl text-sm font-bold cursor-default border border-emerald-500/25">
+                      <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> {order.status === 'DELIVERED' || order.status === 'COMPLETED' ? 'Delivered' : 'In Transit'}
                     </div>
                   ) : (
                     <div className="w-full flex items-center justify-center gap-2 bg-gray-100/50 dark:bg-white/5 text-[var(--text-muted)] py-3 rounded-xl text-sm font-bold cursor-default backdrop-blur-sm border border-gray-200/50 dark:border-white/5">
                       <CheckCircle className="w-4 h-4" /> {order.status?.replace(/_/g, ' ') || 'Processing'}
                     </div>
                   )}
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setReceiptOrder(order);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl text-xs font-bold transition-all shadow-md mt-2 cursor-pointer"
+                  >
+                    <Printer className="w-4 h-4" /> Create Order Receipt
+                  </button>
                 </div>
               </div>
             </motion.div>
@@ -339,9 +339,18 @@ const OrdersView = ({ orders, storeConfig, setPackingOrder, setShippingOrder, ap
           <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white dark:bg-[#111] border border-[var(--accent-gray)] shadow-2xl rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Order Details</h2>
-              <button onClick={() => setSelectedOrderDetails(null)} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
-                <XCircle className="w-6 h-6" />
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setReceiptOrder(currentOrderDetails)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm cursor-pointer"
+                >
+                  <Printer className="w-4 h-4" /> Create Order Receipt
+                </button>
+                <button onClick={() => setSelectedOrderDetails(null)} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
+                  <XCircle className="w-6 h-6" />
+                </button>
+              </div>
             </div>
             
             <div className="space-y-6">
@@ -529,6 +538,15 @@ const OrdersView = ({ orders, storeConfig, setPackingOrder, setShippingOrder, ap
           </motion.div>
         </div>,
         document.body
+      )}
+
+      {/* Printable Receipt Modal */}
+      {receiptOrder && (
+        <PrintableReceiptModal
+          isOpen={Boolean(receiptOrder)}
+          onClose={() => setReceiptOrder(null)}
+          order={receiptOrder}
+        />
       )}
 
     </div>

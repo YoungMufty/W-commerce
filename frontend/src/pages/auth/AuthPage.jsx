@@ -51,6 +51,7 @@ const AuthPage = ({ initialMode = 'login' }) => {
   const [showSignupPass, setShowSignupPass]       = useState(false);
   const [showConfirmPass, setShowConfirmPass]     = useState(false);
   const [selectedRole, setSelectedRole]           = useState('BUYER');
+  const [oauthError, setOauthError]               = useState(null);
 
   const { login, register, loginWithFingerprint, isLoading } = useAuthStore();
   const navigate  = useNavigate();
@@ -60,6 +61,33 @@ const AuthPage = ({ initialMode = 'login' }) => {
   useEffect(() => {
     setIsLogin(initialMode === 'login');
   }, [initialMode]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const err = params.get('error');
+    if (err) {
+      let friendlyMsg = 'Authentication could not be completed. Please try again.';
+      if (err === 'google_callback_failed') {
+        friendlyMsg = 'Google sign-in encountered an error. Please try again or log in with your email and password.';
+      } else if (err === 'google_auth_failed') {
+        friendlyMsg = 'Google authentication was cancelled or failed. Please try again.';
+      } else if (err === 'oauth_not_configured') {
+        friendlyMsg = 'Google sign-in is not configured on this server.';
+      } else if (err === 'token_generation_failed') {
+        friendlyMsg = 'Authentication session creation failed. Please try again.';
+      } else if (err === 'session_expired') {
+        friendlyMsg = 'Your session has expired. Please log in again.';
+      }
+      setOauthError(friendlyMsg);
+      toast.error(friendlyMsg, { id: 'oauth-error', duration: 6000 });
+
+      // Clean the error parameter from URL without triggering a page reload
+      const newParams = new URLSearchParams(location.search);
+      newParams.delete('error');
+      const cleanSearch = newParams.toString() ? `?${newParams.toString()}` : '';
+      window.history.replaceState({}, '', `${location.pathname}${cleanSearch}`);
+    }
+  }, [location.search, location.pathname]);
 
   // Flip between login / signup
   const toggleMode = (e) => {
@@ -163,6 +191,29 @@ const AuthPage = ({ initialMode = 'login' }) => {
             <h1 className="title">Welcome Back</h1>
             <p className="subtitle">Login to continue your journey</p>
 
+            {oauthError && (
+              <div
+                role="alert"
+                style={{
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.35)',
+                  color: '#f87171',
+                  borderRadius: '12px',
+                  padding: '10px 14px',
+                  fontSize: '13px',
+                  marginBottom: '16px',
+                  lineHeight: '1.4',
+                  textAlign: 'left',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <span style={{ fontSize: '16px', flexShrink: 0 }}>⚠️</span>
+                <span>{oauthError}</span>
+              </div>
+            )}
+
             <form id="loginForm" onSubmit={handleLoginSubmit}>
 
               <div className="form-group">
@@ -243,6 +294,29 @@ const AuthPage = ({ initialMode = 'login' }) => {
             <div className="logo">👤</div>
             <h1 className="title">Create Account</h1>
             <p className="subtitle">Start your journey with us</p>
+
+            {oauthError && (
+              <div
+                role="alert"
+                style={{
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.35)',
+                  color: '#f87171',
+                  borderRadius: '12px',
+                  padding: '10px 14px',
+                  fontSize: '13px',
+                  marginBottom: '16px',
+                  lineHeight: '1.4',
+                  textAlign: 'left',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <span style={{ fontSize: '16px', flexShrink: 0 }}>⚠️</span>
+                <span>{oauthError}</span>
+              </div>
+            )}
 
             <form id="signupForm" onSubmit={handleSignupSubmit}>
 

@@ -132,6 +132,10 @@ export const useAuthStore = create((set) => ({
     try {
       const response = await axios.get('/api/v1/auth/me');
       if (response.data.success || response.data.status === 'success') {
+        const token = response.data.token || response.data.data?.token;
+        if (token) {
+          localStorage.setItem('token', token);
+        }
         set({ user: response.data.data?.user || response.data.user || response.data.data, isAuthenticated: true, isCheckingAuth: false });
       } else {
         resetAllStores();
