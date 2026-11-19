@@ -59,7 +59,7 @@ export function parseReceiptData(msg) {
   const paymentMethod =
     tr?.paymentMethod ||
     content.match(/Payment\s+Method:\*?\*?\s*[*`]*([^*\n`]+)[*`]*/i)?.[1]?.trim() ||
-    (content.toLowerCase().includes('paypal') ? 'PayPal (USD)' : 'W-Commerce Wallet');
+    (content.toLowerCase().includes('paypal') ? 'PayPal (USD)' : 'whats\'app shop Wallet');
 
   // Amount in USD
   const parsedAmtUSD = tr?.amountUSD ?? tr?.grandTotal ?? tr?.amount;
@@ -230,7 +230,7 @@ export default function OfficialReceiptCard({
                 </div>
               ) : (
                 <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-xs font-bold text-purple-600 dark:text-purple-300">
-                  <span>W-Commerce Escrow Wallet</span>
+                  <span>OpenSlug Escrow Wallet</span>
                   <span className="text-[11px] font-medium text-[var(--text-main)]">• Multi-Sig Hold</span>
                 </div>
               )}
@@ -413,7 +413,7 @@ export default function OfficialReceiptCard({
 
             <div className="flex items-center gap-1 font-medium text-[10px]">
               <ShieldCheck size={12} className="text-emerald-500" />
-              <span>Protected by W-Commerce Multi-Sig Escrow</span>
+              <span>Protected by OpenSlug Multi-Sig Escrow</span>
             </div>
           </div>
 

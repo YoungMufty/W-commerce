@@ -237,13 +237,13 @@ export default function PayAICartDrawer({
                 </div>
                 <div>
                   <h3 className="font-black text-sm sm:text-base flex items-center gap-2">
-                    PayAI W-Commerce Cart
+                    PayAI OpenSlug Cart
                     <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 font-black">
                       {itemCount} {itemCount === 1 ? 'item' : 'items'}
                     </span>
                   </h3>
                   <span className="text-[10px] text-[var(--text-muted)] font-medium leading-tight block">
-                    W-Commerce Direct Purchases • Paid in USD via PayPal • Seller receives payout in Naira (NGN)
+                    OpenSlug Direct Purchases • Paid in USD via PayPal • Seller receives payout in Naira (NGN)
                   </span>
                 </div>
               </div>
@@ -276,16 +276,16 @@ export default function PayAICartDrawer({
                     <ShoppingBag size={32} />
                   </div>
                   <h4 className="font-bold text-sm text-[var(--text-main)]">
-                    Your PayAI W-Commerce Cart is empty.
+                    Your PayAI OpenSlug Cart is empty.
                   </h4>
                   <p className="text-xs max-w-xs mt-1.5 leading-relaxed">
-                    Search native W-Commerce products or negotiate with sellers to checkout with PayPal.
+                    Search native OpenSlug products or negotiate with sellers to checkout with PayPal.
                   </p>
                   <button
                     onClick={onClose}
                     className="mt-4 neu-button-primary px-4 py-2 rounded-xl text-xs font-bold"
                   >
-                    Browse W-Commerce Stores
+                    Browse OpenSlug Stores
                   </button>
                 </div>
               ) : (

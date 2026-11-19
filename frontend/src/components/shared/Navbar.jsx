@@ -5,6 +5,7 @@ import SearchBar from './SearchBar';
 import MegaMenu from './MegaMenu';
 import NotificationBell from './NotificationBell';
 import MobileDrawer from './MobileDrawer';
+import OpenSlugLogo from './OpenSlugLogo';
 import { useCartStore } from '../../store/cartStore';
 import { useAuthStore } from '../../store/authStore';
 import { useQRStore } from '../../store/qrStore';
@@ -67,13 +68,9 @@ const Navbar = ({ onSearch, onCategorySelect }) => {
           >
             <Menu size={24} />
           </button>
-          <Link to="/" className="inline-flex items-center gap-2 group shrink-0">
-            <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--text-main)] to-[var(--accent-gray)] flex items-center justify-center font-black text-[var(--bg-primary)] shadow-lg group-hover:shadow-xl group-hover:scale-105 transition-all duration-300">
-              X
-            </span>
-            <span className="text-xl font-black tracking-tighter text-[var(--text-main)] transition-colors hidden sm:block uppercase">
-              Global<span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--accent-gray)] to-gray-400">X</span>
-            </span>
+          {/* OpenSlug 3D Blender Brand Logo with Framer Motion */}
+          <Link to="/" className="inline-flex items-center select-none shrink-0">
+            <OpenSlugLogo size="md" showText={true} showBadge={true} showTagline={false} />
           </Link>
         </div>
 

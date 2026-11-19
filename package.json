@@ -11,7 +11,7 @@
     "dev:frontend": "npm run dev --workspace=frontend",
     "dev:backend": "node scripts/ensure-prisma-client.cjs && npm run dev --workspace=backend",
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
-    "build": "node scripts/sync-postgres-schema.cjs && npx prisma generate --schema=database/prisma/postgres/schema.prisma && npm run build --workspace=frontend",
+    "build": "node scripts/ensure-prisma-client.cjs && npm run build --workspace=frontend",
     "build:production": "npm run build --workspace=frontend",
     "db:ensure": "node scripts/ensure-prisma-client.cjs",
     "db:generate:dev": "prisma generate --schema=database/prisma/schema.prisma",
@@ -28,8 +28,7 @@
     "env:validate": "node scripts/validate-production-env.cjs"
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0",
-    "prisma": "^5.22.0"
+    "@prisma/client": "^5.22.0"
   },
   "devDependencies": {
     "concurrently": "^10.0.5"

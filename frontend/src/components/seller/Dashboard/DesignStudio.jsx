@@ -11,6 +11,7 @@ import { PLACEHOLDER_AVATAR, PLACEHOLDER_BANNER } from '@/constants/placeholders
 
 import { categories } from '../../../config/bannerStyles';
 import { layoutLibrary } from '../../../config/layoutLibrary';
+import FreeBannerPickerModal from '../FreeBannerPickerModal';
 
 const FONTS = [
   'Inter', 'Playfair Display', 'Syne', 'Montserrat', 'Poppins', 'Lato', 'Roboto', 'Oswald',
@@ -70,6 +71,7 @@ const DesignStudio = () => {
 
   const [isLayoutModalOpen, setIsLayoutModalOpen] = useState(false);
   const [isBannerLayoutModalOpen, setIsBannerLayoutModalOpen] = useState(false);
+  const [isFreeBannerModalOpen, setIsFreeBannerModalOpen] = useState(false);
   const [recentColors, setRecentColors] = useState(null);
 
   const [reviewsConfig, setReviewsConfig] = useState({
@@ -363,9 +365,38 @@ const DesignStudio = () => {
                   <label className="text-xs font-semibold text-slate-600 dark:text-gray-300">Subtitle</label>
                   <input type="text" value={template.subtitle} onChange={(e) => handleUpdate('subtitle', e.target.value)} className="w-full px-3 py-2 bg-slate-100 dark:bg-white/5 border-none rounded-lg text-sm text-slate-900 dark:text-white" />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600 dark:text-gray-300">Background Image URL</label>
-                  <input type="text" value={template.bgImage} onChange={(e) => handleUpdate('bgImage', e.target.value)} className="w-full px-3 py-2 bg-slate-100 dark:bg-white/5 border-none rounded-lg text-sm text-slate-900 dark:text-white" />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-600 dark:text-gray-300">Background Image</label>
+                    <button
+                      type="button"
+                      onClick={() => setIsFreeBannerModalOpen(true)}
+                      className="text-xs font-bold text-orange-500 hover:text-orange-400 bg-orange-500/10 hover:bg-orange-500/20 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1"
+                    >
+                      <Sparkles size={13} /> Browse Free Banners
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={template.bgImage} 
+                      onChange={(e) => handleUpdate('bgImage', e.target.value)} 
+                      placeholder="https://..."
+                      className="flex-1 px-3 py-2 bg-slate-100 dark:bg-white/5 border-none rounded-lg text-sm text-slate-900 dark:text-white" 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsFreeBannerModalOpen(true)}
+                      className="px-3 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-lg text-xs font-bold hover:brightness-110 transition flex items-center gap-1 shrink-0"
+                    >
+                      <Sparkles size={13} /> Pick Free
+                    </button>
+                  </div>
+                  {template.bgImage && (
+                    <div className="relative aspect-[3/1] w-full rounded-lg overflow-hidden border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 mt-1">
+                      <img src={template.bgImage} alt="Banner Preview" className="w-full h-full object-cover" />
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -849,6 +880,20 @@ const DesignStudio = () => {
           </>
         )}
       </AnimatePresence>
+
+      {/* Free Category Banner Picker Modal */}
+      <FreeBannerPickerModal
+        isOpen={isFreeBannerModalOpen}
+        onClose={() => setIsFreeBannerModalOpen(false)}
+        currentCategory={store.category || 'food'}
+        storeName={store.storeName || 'My Store'}
+        storeLogo={store.logoUrl || ''}
+        tagline={store.tagline || 'Curated products for a better life'}
+        activeBannerUrl={template.bgImage || ''}
+        onSelectBanner={(url) => {
+          handleUpdate('bgImage', url);
+        }}
+      />
 </div>
   );
 };

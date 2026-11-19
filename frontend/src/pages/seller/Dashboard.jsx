@@ -46,6 +46,7 @@ import ExternalSiteStudio from '../../components/seller/Dashboard/ExternalSiteSt
 import SellerNegotiationControlRoom from '../../components/seller/Dashboard/SellerNegotiationControlRoom';
 import AppealDisputeStudio from '../../components/seller/Dashboard/AppealDisputeStudio';
 import AppealReviewStudio from '../../components/seller/Dashboard/AppealReviewStudio';
+import FreeBannerPickerModal from '../../components/seller/FreeBannerPickerModal';
 
 // ── Error Boundary: prevents blank white screen on any render crash ───────────
 class SellerDashboardErrorBoundary extends React.Component {
@@ -138,6 +139,7 @@ const SellerDashboard = ({ initialTab }) => {
   const [isPremiumModalOpen, setIsPremiumModalOpen] = useState(false);
   const [selectedTierToUnlock, setSelectedTierToUnlock] = useState(null);
   const [isFreightModalOpen, setIsFreightModalOpen] = useState(false);
+  const [isBannerPickerOpen, setIsBannerPickerOpen] = useState(false);
   
   const [portfolio, setPortfolio] = useState({ theme: 'Aura Modern', slug: '' });
   const [brandConfig, setBrandConfig] = useState({ primaryColor: '#d3d3d3', secondaryColor: '#1a1a1a', fontFamily: 'Inter', customCss: '' });
@@ -1051,36 +1053,109 @@ const SellerDashboard = ({ initialTab }) => {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs text-[var(--text-muted)] mb-1 uppercase tracking-wide">Banner URL</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs text-[var(--text-muted)] uppercase tracking-wide">Store Category</label>
+                      <span className="text-[11px] text-orange-600 font-semibold flex items-center gap-1">
+                        <Sparkles size={11} /> Auto-suggests free banners
+                      </span>
+                    </div>
+                    <select 
+                      value={storeConfig.category || 'food'} 
+                      onChange={e => setStoreConfig({...storeConfig, category: e.target.value})} 
+                      className="w-full bg-white border border-[var(--border-color)] rounded-lg p-3 text-black outline-none focus:border-gray-500 transition-colors font-medium cursor-pointer"
+                    >
+                      <option value="food">🍔 Food & Dining / Restaurant / Groceries</option>
+                      <option value="fashion">👗 Fashion & Apparel / Boutique / Shoes</option>
+                      <option value="electronics">💻 Electronics & Tech / Gadgets / Audio</option>
+                      <option value="beauty">💄 Beauty, Cosmetics & Skincare</option>
+                      <option value="gaming">🎮 Gaming & Esports / Battle Station</option>
+                      <option value="home">🏠 Home & Living / Furniture / Decor</option>
+                      <option value="sports">⚽ Sports, Fitness & Activewear</option>
+                      <option value="books">📚 Books & Stationery / Education</option>
+                      <option value="toys">🧸 Toys & Kids / Baby Care</option>
+                      <option value="jewelry">💍 Jewelry & Luxury / Watches</option>
+                      <option value="health">💊 Health & Wellness / Supplements</option>
+                      <option value="auto">🚗 Automotive & Motors / Detailing</option>
+                      <option value="pets">🐾 Pets & Animal Care</option>
+                      <option value="coffee">☕ Cafe, Coffee & Bakery</option>
+                    </select>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs text-[var(--text-muted)] uppercase tracking-wide">Store Banner</label>
+                      <button
+                        type="button"
+                        onClick={() => setIsBannerPickerOpen(true)}
+                        className="text-xs font-bold text-orange-600 hover:text-orange-700 flex items-center gap-1 transition-colors"
+                      >
+                        <Sparkles size={12} /> Browse Free Banners
+                      </button>
+                    </div>
                     <div className="flex flex-col gap-2">
-                      {storeConfig.bannerUrl ? <img src={storeConfig.bannerUrl} alt="Banner" className="h-24 w-full object-cover bg-gray-100 rounded-lg border" /> : null}
-                      <div className="flex items-center gap-4">
-                        <input type="text" value={storeConfig.bannerUrl || ''} onChange={e => setStoreConfig({...storeConfig, bannerUrl: e.target.value})} className="flex-1 bg-white border border-[var(--border-color)] rounded-lg p-3 text-black outline-none focus:border-gray-500 transition-colors" placeholder="https://..." />
-                        <label className="cursor-pointer bg-blue-600 text-white px-4 py-3 rounded-lg font-bold hover:bg-blue-700 transition">
-                          Upload
-                          <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
-                            if (e.target.files && e.target.files[0]) {
-                              const formData = new FormData();
-                              formData.append('file', e.target.files[0]);
-                              formData.append('type', 'banner');
-                              const toast = (await import('react-hot-toast')).default;
-                              const loadingToast = toast.loading('Uploading banner...');
-                              try {
-                                const res = await axios.post('/api/v1/stores/upload-asset', formData);
-                                toast.dismiss(loadingToast);
-                                if (res.data.success) {
-                                  setStoreConfig(prev => ({...prev, bannerUrl: res.data.url}));
-                                  toast.success('Banner uploaded successfully');
-                                } else {
-                                  toast.error(res.data.message || 'Banner upload failed');
+                      {storeConfig.bannerUrl ? (
+                        <div className="relative group rounded-xl overflow-hidden border border-[var(--border-color)] bg-slate-950">
+                          <img src={storeConfig.bannerUrl} alt="Store Banner" className="h-28 w-full object-cover" />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setIsBannerPickerOpen(true)}
+                              className="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-lg"
+                            >
+                              <Sparkles size={13} /> Change Banner
+                            </button>
+                            <a
+                              href={storeConfig.bannerUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1"
+                            >
+                              View Full
+                            </a>
+                          </div>
+                        </div>
+                      ) : null}
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <input 
+                          type="text" 
+                          value={storeConfig.bannerUrl || ''} 
+                          onChange={e => setStoreConfig({...storeConfig, bannerUrl: e.target.value})} 
+                          className="flex-1 bg-white border border-[var(--border-color)] rounded-lg p-3 text-black outline-none focus:border-gray-500 transition-colors text-sm" 
+                          placeholder="Paste image URL or browse free banners..." 
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsBannerPickerOpen(true)}
+                            className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white px-4 py-3 rounded-lg font-bold transition flex items-center justify-center gap-1.5 shadow-sm text-sm shrink-0"
+                          >
+                            <Sparkles size={15} /> Free Banners
+                          </button>
+                          <label className="cursor-pointer bg-slate-900 text-white px-4 py-3 rounded-lg font-bold hover:bg-black transition flex items-center justify-center gap-1 text-sm shrink-0">
+                            Upload
+                            <input type="file" className="hidden" accept="image/*" onChange={async (e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                const formData = new FormData();
+                                formData.append('file', e.target.files[0]);
+                                formData.append('type', 'banner');
+                                const toast = (await import('react-hot-toast')).default;
+                                const loadingToast = toast.loading('Uploading banner...');
+                                try {
+                                  const res = await axios.post('/api/v1/stores/upload-asset', formData);
+                                  toast.dismiss(loadingToast);
+                                  if (res.data.success) {
+                                    setStoreConfig(prev => ({...prev, bannerUrl: res.data.url}));
+                                    toast.success('Banner uploaded successfully');
+                                  } else {
+                                    toast.error(res.data.message || 'Banner upload failed');
+                                  }
+                                } catch (err) {
+                                  toast.dismiss(loadingToast);
+                                  toast.error(err.response?.data?.message || err.message || 'Upload failed');
                                 }
-                              } catch (err) {
-                                toast.dismiss(loadingToast);
-                                toast.error(err.response?.data?.message || err.message || 'Upload failed');
                               }
-                            }
-                          }} />
-                        </label>
+                            }} />
+                          </label>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1267,6 +1342,24 @@ const SellerDashboard = ({ initialTab }) => {
         isOpen={isDisputeModalOpen}
         onClose={() => { setIsDisputeModalOpen(false); setRespondingDispute(null); }}
         dispute={respondingDispute}
+      />
+
+      {/* Free Category Banner Picker Modal */}
+      <FreeBannerPickerModal
+        isOpen={isBannerPickerOpen}
+        onClose={() => setIsBannerPickerOpen(false)}
+        currentCategory={storeConfig.category || 'food'}
+        storeName={storeConfig.storeName || 'My Store'}
+        storeLogo={storeConfig.logoUrl || ''}
+        tagline={storeConfig.description || 'Quality products & fast delivery'}
+        activeBannerUrl={storeConfig.bannerUrl || ''}
+        onSelectBanner={(url, bannerInfo) => {
+          setStoreConfig(prev => ({
+            ...prev,
+            bannerUrl: url,
+            category: prev.category || bannerInfo.category
+          }));
+        }}
       />
     </div>
   );

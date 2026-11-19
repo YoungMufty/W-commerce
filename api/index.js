@@ -27,7 +27,7 @@ try {
   console.error('[Vercel Serverless Cold Boot Fatal Error]:', err);
 }
 
-module.exports = (req, res) => {
+const handler = (req, res) => {
   if (bootError) {
     console.error('[Vercel Serverless Boot Failure Serving Request]:', bootError);
     if (!res.headersSent) {
@@ -40,6 +40,14 @@ module.exports = (req, res) => {
       });
     }
     return;
+  }
+
+  // Handle URL normalization when Vercel rewrites routes to /api/index.js
+  if (req.url === '/api/index.js' || req.url.startsWith('/api/index.js?')) {
+    const forwardedUrl = req.headers['x-vercel-original-url'] || req.headers['x-matched-path'] || req.headers['x-forwarded-uri'];
+    if (forwardedUrl) {
+      req.url = forwardedUrl;
+    }
   }
 
   try {
@@ -56,4 +64,7 @@ module.exports = (req, res) => {
     }
   }
 };
+
+handler.app = app;
+module.exports = handler;
 

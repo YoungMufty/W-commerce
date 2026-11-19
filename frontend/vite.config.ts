@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
+import fs from 'fs'
 import { fileURLToPath } from 'url'
 
 const __dirname = import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.url))
@@ -77,9 +78,11 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
-        "react": path.resolve(__dirname, "../node_modules/react"),
-        "react-dom": path.resolve(__dirname, "../node_modules/react-dom"),
-        "react-router-dom": path.resolve(__dirname, "../node_modules/react-router-dom"),
+        ...(fs.existsSync(path.resolve(__dirname, "../node_modules/react")) ? {
+          "react": path.resolve(__dirname, "../node_modules/react"),
+          "react-dom": path.resolve(__dirname, "../node_modules/react-dom"),
+          "react-router-dom": path.resolve(__dirname, "../node_modules/react-router-dom"),
+        } : {})
       },
       dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime', 'react-router', 'react-router-dom']
     },

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { X, User, ShoppingBag, Home, Search, Heart, Settings, MessageCircle, Sparkles, QrCode } from 'lucide-react';
 import { ROUTES } from '../../constants/routes';
 import { useQRStore } from '../../store/qrStore';
+import OpenSlugLogo from './OpenSlugLogo';
 import './MobileDrawer.css';
 
 const MobileDrawer = ({ isOpen, onClose, isAuthenticated, user, cartItemsCount }) => {
@@ -27,9 +28,9 @@ const MobileDrawer = ({ isOpen, onClose, isAuthenticated, user, cartItemsCount }
             className="fixed inset-y-0 left-0 w-3/4 max-w-sm mobile-drawer-neumorphic z-[100] flex flex-col lg:hidden"
           >
             <div className="flex items-center justify-between mobile-drawer-header">
-              <span className="text-2xl font-black tracking-tighter text-[#101827] uppercase">
-                Global<span className="text-transparent bg-clip-text bg-gradient-to-r from-gray-600 to-gray-400">X</span>
-              </span>
+              <Link to="/" onClick={onClose} className="inline-flex items-center">
+                <OpenSlugLogo size="sm" showBadge={true} showTagline={false} />
+              </Link>
               <button onClick={onClose} className="p-2.5 rounded-full neu-btn">
                 <X size={20} />
               </button>

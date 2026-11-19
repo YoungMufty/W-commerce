@@ -352,13 +352,17 @@ const updateStoreProfile = async (req, res) => {
         const VALID_STORE_COLUMNS = [
             'portfolioLayout', 'brandStory', 'portfolioSlug',
             'bankName', 'accountNumber', 'accountName', 'bankCode',
-            'storeName', 'description', 'country', 'defaultDeliveryDays'
+            'storeName', 'description', 'country', 'defaultDeliveryDays',
+            'category', 'bannerUrl', 'logoUrl'
         ];
 
         const safeData = {};
         VALID_STORE_COLUMNS.forEach(field => {
             if (data[field] !== undefined) safeData[field] = data[field];
         });
+        if (data.bannerUrl !== undefined) safeData.bannerUrl = data.bannerUrl;
+        if (data.logoUrl !== undefined) safeData.logoUrl = data.logoUrl;
+        if (data.category !== undefined) safeData.category = data.category;
 
         // Config fields (paymentGatewayType, routingNumber, bankCountry, paymentConfig, etc.)
         // are safely stored inside portfolioConfig JSON so Prisma doesn't reject unknown columns

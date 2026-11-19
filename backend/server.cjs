@@ -97,9 +97,14 @@ process.on('uncaughtException', (error) => {
 
 const app = require('./src/app.cjs');
 
-// In Vercel Serverless, do NOT start HTTP listeners, bind ports, or call server.listen()
-// Vercel wraps the exported Express app as an ephemeral serverless request handler
-if (!process.env.VERCEL) {
+// Standalone vs Serverless execution guard:
+// If executed directly (e.g., `node server.cjs` or `npm start` in container/services runner),
+// start the HTTP listener and Socket.io. If required as a module in Vercel Serverless,
+// export the Express app without binding ports.
+const isDirectExecution = require.main === module;
+const isVercelServerless = Boolean(process.env.VERCEL) && !isDirectExecution;
+
+if (!isVercelServerless) {
     const server = http.createServer(app);
     globalStartup.server = server;
     try {
@@ -110,8 +115,6 @@ if (!process.env.VERCEL) {
     } catch (e) {
         logger.warn(`Socket initialization skipped: ${e.message}`);
     }
-
-    const PORT = process.env.PORT || 3000;
 
     // ============================================================================
     // START SERVER WITH PROPER ERROR HANDLING (STANDALONE ONLY)

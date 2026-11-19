@@ -1,21 +1,40 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Printer, ShieldCheck, QrCode, CheckCircle2 } from 'lucide-react';
+import { 
+  X, Printer, ShieldCheck, QrCode, CheckCircle2, Lock, Unlock, 
+  Sparkles, AlertCircle, ShoppingBag, Check 
+} from 'lucide-react';
 import QRCode from 'react-qr-code';
+import { toast } from 'react-hot-toast';
 import { useQRStore } from '../../store/qrStore';
 
 const PrintableReceiptModal = ({ isOpen, onClose, order }) => {
   const { openShare } = useQRStore();
+  const [qrStatus, setQrStatus] = useState(order?.qrSubscriptionStatus || 'PAID'); // 'PAID' | 'UNPAID'
+  const [isActivatingQR, setIsActivatingQR] = useState(false);
+
   if (!isOpen || !order) return null;
 
   const handlePrint = () => {
     window.print();
   };
 
+  const handleActivateQR = () => {
+    setIsActivatingQR(true);
+    setTimeout(() => {
+      setQrStatus('PAID');
+      setIsActivatingQR(false);
+      toast.success('QR Seal successfully activated for ₦100 on whats\'app shop!', {
+        icon: '✅',
+        duration: 3500
+      });
+    }, 600);
+  };
+
   // Safe receipt theme config
   let receiptConfig = {
     headerText: 'ORDER RECEIPT',
-    footerText: 'Thank you for your business! All orders protected by W-Commerce Escrow Guarantee.',
+    footerText: 'Thank you for your business! All orders verified and protected by whats\'app shop.',
     themeColor: '#059669'
   };
 
@@ -94,6 +113,18 @@ const PrintableReceiptModal = ({ isOpen, onClose, order }) => {
                     order.store?.storeName || 
                     'Official Merchant Store';
 
+  // Fallback image helper
+  const getProductImage = (item) => {
+    return item.product?.image || 
+           item.product?.imageUrl || 
+           item.product?.images?.[0] || 
+           item.image || 
+           item.imageUrl || 
+           'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=150&q=80';
+  };
+
+  const isQRPaid = qrStatus === 'PAID';
+
   return createPortal(
     <div 
       className="fixed inset-0 z-[300] flex items-center justify-center p-3 sm:p-6 bg-black/75 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200 print:bg-white print:p-0 print:backdrop-blur-none"
@@ -104,27 +135,51 @@ const PrintableReceiptModal = ({ isOpen, onClose, order }) => {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header Controls (Hidden during physical print) */}
-        <div className="p-4 sm:px-6 border-b border-slate-200 flex justify-between items-center bg-slate-50 print:hidden shrink-0">
+        <div className="p-4 sm:px-6 border-b border-slate-200 flex flex-wrap justify-between items-center gap-3 bg-slate-50 print:hidden shrink-0">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600">
+            <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
               <ShieldCheck size={18} />
             </div>
             <div>
               <h3 className="font-bold text-sm text-slate-800 leading-tight">Official Order Receipt</h3>
-              <p className="text-[11px] font-mono font-medium text-slate-500">#{orderIdShort} • Escrow Verified</p>
+              <p className="text-[11px] font-mono font-medium text-slate-500">#{orderIdShort} &bull; OpenSlug Verified</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* QR Status Controller (Toggle Paid / Unpaid) */}
+            <button
+              type="button"
+              onClick={() => {
+                const nextStatus = isQRPaid ? 'UNPAID' : 'PAID';
+                setQrStatus(nextStatus);
+                toast(
+                  nextStatus === 'PAID' ? 'QR Code marked as Paid & Active' : 'QR Code marked as Unpaid (₦100 required)',
+                  { icon: nextStatus === 'PAID' ? '✅' : '🔒' }
+                );
+              }}
+              className={`px-3 py-1.5 text-[11px] font-black rounded-xl border flex items-center gap-1.5 transition-all cursor-pointer ${
+                isQRPaid
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
+                  : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
+              }`}
+              title="Click to toggle QR subscription status"
+            >
+              {isQRPaid ? <Unlock size={13} className="text-emerald-600" /> : <Lock size={13} className="text-amber-600" />}
+              <span>QR: {isQRPaid ? 'Paid' : 'Unpaid (₦100)'}</span>
+            </button>
+
             <button 
               type="button"
               onClick={() => openShare({
                 type: 'receipt',
                 id: orderIdStr,
                 title: `Receipt #${orderIdShort}`,
-                subtitle: `Amount: ₦${totalAmountNum.toLocaleString(undefined, { minimumFractionDigits: 2 })} • ${order.paymentMethod || 'Escrow'}`,
+                subtitle: `Amount: ₦${totalAmountNum.toLocaleString(undefined, { minimumFractionDigits: 2 })} &bull; OpenSlug`,
                 amount: totalAmountNum,
                 currency: 'NGN',
                 status: order.paymentStatus || 'PAID',
+                isPaid: isQRPaid,
                 metadata: {
                   buyer: buyerName,
                   store: storeName
@@ -169,7 +224,7 @@ const PrintableReceiptModal = ({ isOpen, onClose, order }) => {
                 {receiptConfig.headerText}
               </h1>
               <p className="font-bold text-slate-800 text-base">{storeName}</p>
-              <p className="text-xs text-slate-500 mt-0.5">Verified Merchant Account &bull; W-Commerce Platform</p>
+              <p className="text-xs text-slate-500 mt-0.5">Verified Merchant Account &bull; OpenSlug</p>
             </div>
             <div className="text-left sm:text-right text-xs">
               <p className="text-slate-400 font-bold uppercase tracking-wider text-[10px] mb-0.5">RECEIPT NUMBER</p>
@@ -193,18 +248,18 @@ const PrintableReceiptModal = ({ isOpen, onClose, order }) => {
                 <CheckCircle2 size={14} /> {(order.paymentStatus || 'PAID').replace(/_/g, ' ')}
               </p>
               <p className="text-slate-600 capitalize">
-                Method: {(order.paymentMethod || 'Direct Escrow Transfer').replace(/_/g, ' ')}
+                Method: {(order.paymentMethod || 'Direct Bank').replace(/_/g, ' ')}
               </p>
-              <p className="text-[11px] text-slate-400 mt-1.5 font-medium">Escrow Protection: 100% Guaranteed</p>
+              <p className="text-[11px] text-slate-400 mt-1.5 font-medium">Protection: 100% Guaranteed on OpenSlug</p>
             </div>
           </div>
           
-          {/* Line Items Table */}
+          {/* Line Items Table with Product Images */}
           <div className="overflow-x-auto mb-6">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b-2 border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                  <th className="text-left py-2.5">Item Description</th>
+                  <th className="text-left py-2.5">Item & Description</th>
                   <th className="text-center py-2.5 px-3">Qty</th>
                   <th className="text-right py-2.5">Unit Price</th>
                   <th className="text-right py-2.5">Total</th>
@@ -217,15 +272,33 @@ const PrintableReceiptModal = ({ isOpen, onClose, order }) => {
                     const qty = Number(item.quantity ?? 1);
                     const lineTotal = unitPrice * qty;
                     const itemTitle = item.product?.title || item.productName || item.title || `Item #${index + 1}`;
+                    const itemImg = getProductImage(item);
+
                     return (
                       <tr key={index} className="hover:bg-slate-50/50 transition-colors">
                         <td className="py-3 pr-2">
-                          <p className="font-bold text-slate-800 text-xs sm:text-sm">{itemTitle}</p>
-                          {item.variants && Object.keys(item.variants).length > 0 && (
-                            <p className="text-[10px] text-slate-400 mt-0.5">
-                              {Object.entries(item.variants).map(([k, v]) => `${k}: ${v}`).join(' | ')}
-                            </p>
-                          )}
+                          <div className="flex items-center gap-3">
+                            {/* Product Thumbnail Image */}
+                            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0 shadow-2xs">
+                              <img
+                                src={itemImg}
+                                alt={itemTitle}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=150&q=80';
+                                }}
+                              />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-bold text-slate-800 text-xs sm:text-sm truncate">{itemTitle}</p>
+                              {item.variants && Object.keys(item.variants).length > 0 && (
+                                <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                                  {Object.entries(item.variants).map(([k, v]) => `${k}: ${v}`).join(' | ')}
+                                </p>
+                              )}
+                              <p className="text-[10px] text-emerald-600 font-medium">Verified OpenSlug product</p>
+                            </div>
+                          </div>
                         </td>
                         <td className="py-3 px-3 text-center text-slate-700 font-bold">{qty}</td>
                         <td className="py-3 text-right text-slate-600 font-mono">
@@ -270,22 +343,66 @@ const PrintableReceiptModal = ({ isOpen, onClose, order }) => {
             </div>
           </div>
           
-          {/* QR Verification Seal & Escrow Guarantee */}
-          <div className="flex items-center justify-between border-t border-slate-200 pt-6 mt-4 gap-4 bg-slate-50/70 p-4 rounded-2xl border">
-            <div className="text-left text-xs text-slate-600 max-w-sm">
-              <p className="font-black text-slate-800 uppercase tracking-wider text-[11px] mb-1 flex items-center gap-1.5">
-                <ShieldCheck size={14} className="text-emerald-600" /> Authenticity QR Seal
-              </p>
-              <p className="text-[11px] leading-relaxed text-slate-500">
-                Scan with any mobile device or WhatsApp to verify order integrity, escrow lock, and delivery status directly on the network.
-              </p>
-            </div>
-            <div className="p-2 bg-white rounded-xl border border-slate-200 shadow-xs shrink-0">
-              <QRCode
-                value={`${typeof window !== 'undefined' ? window.location.origin : 'https://w-commerce.app'}/receipt/${orderIdStr}?verified=true`}
-                size={68}
-                level="M"
-              />
+          {/* Controlled QR Verification Seal System (Paid vs Unpaid QR Subscription) */}
+          <div className={`border pt-5 pb-5 px-5 rounded-2xl transition-all ${
+            isQRPaid ? 'bg-slate-50/80 border-slate-200' : 'bg-amber-50/70 border-amber-200'
+          }`}>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="text-left text-xs max-w-sm">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <p className="font-black text-slate-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <ShieldCheck size={14} className={isQRPaid ? 'text-emerald-600' : 'text-amber-600'} /> Authenticity QR Seal
+                  </p>
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                    isQRPaid 
+                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' 
+                      : 'bg-amber-100 text-amber-800 border border-amber-300'
+                  }`}>
+                    {isQRPaid ? 'ACTIVE & VERIFIED' : 'UNPAID QR SEAL'}
+                  </span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-slate-500">
+                  {isQRPaid 
+                    ? 'Scan with any mobile device or WhatsApp to verify order integrity, store authenticity, and delivery status directly on whats\'app shop.' 
+                    : 'This QR Seal requires an active ₦100 QR subscription to enable public cryptographic order scanning.'
+                  }
+                </p>
+
+                {!isQRPaid && (
+                  <button
+                    type="button"
+                    onClick={handleActivateQR}
+                    disabled={isActivatingQR}
+                    className="mt-3 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs inline-flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                  >
+                    <Sparkles size={13} />
+                    <span>{isActivatingQR ? 'Activating...' : 'Pay ₦100 to Activate QR'}</span>
+                  </button>
+                )}
+              </div>
+
+              {/* QR Container with Active / Unpaid Lock State */}
+              <div className="relative p-2.5 bg-white rounded-2xl border border-slate-200 shadow-xs shrink-0 self-start sm:self-auto">
+                <div className={isQRPaid ? 'opacity-100 transition-opacity' : 'opacity-25 filter blur-[1px]'}>
+                  <QRCode
+                    value={`${typeof window !== 'undefined' ? window.location.origin : 'https://whatsappshop.ng'}/receipt/${orderIdStr}?verified=${isQRPaid}`}
+                    size={72}
+                    level="M"
+                  />
+                </div>
+
+                {!isQRPaid && (
+                  <div className="absolute inset-0 rounded-2xl bg-slate-900/40 backdrop-blur-[1px] flex flex-col items-center justify-center p-1 text-white text-center">
+                    <Lock size={18} className="text-amber-400 mb-0.5" />
+                    <span className="text-[9px] font-black uppercase tracking-tight text-white leading-tight">
+                      Locked
+                    </span>
+                    <span className="text-[8px] font-bold text-amber-300 leading-tight">
+                      ₦100 Sub
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
