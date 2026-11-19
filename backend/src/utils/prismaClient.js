@@ -80,42 +80,64 @@ if (activeDatabaseUrl) {
 }
 
 let basePrisma = globalForPrisma.__basePrisma;
+let prismaInitFailed = false;
+
 if (!basePrisma) {
-    basePrisma = new PrismaClient(clientOptions);
-    globalForPrisma.__basePrisma = basePrisma;
+    try {
+        basePrisma = new PrismaClient(clientOptions);
+        globalForPrisma.__basePrisma = basePrisma;
+    } catch (err) {
+        prismaInitFailed = true;
+        logger.error(`[Prisma] PrismaClient constructor failed: ${err.message}`);
+        basePrisma = {
+            $extends: () => basePrisma,
+            $disconnect: async () => {},
+            $queryRaw: async () => { throw new Error(`Database client unavailable: ${err.message}`); },
+            $executeRaw: async () => { throw new Error(`Database client unavailable: ${err.message}`); }
+        };
+        globalForPrisma.__basePrisma = basePrisma;
+    }
 }
 
 // ── Query-level connection error guard ───────────────────────────────────────
 // Catches transient connection drops and pool timeouts without crashing Express.
-const extendedPrisma = basePrisma.$extends({
-    query: {
-        $allModels: {
-            async $allOperations({ model, operation, args, query }) {
-                try {
-                    return await query(args);
-                } catch (err) {
-                    const isConnError = (
-                        (typeof err.code === 'string' && (err.code.startsWith('P1') || err.code === 'P2024')) ||
-                        err.name === 'PrismaClientInitializationError' ||
-                        err.name === 'PrismaClientRustPanicError' ||
-                        err.message?.includes('Connection pool timed out') ||
-                        err.message?.includes('Server has closed the connection') ||
-                        err.message?.includes('Can\'t reach database server') ||
-                        err.message?.includes('connect ECONNREFUSED')
-                    );
+let extendedPrisma = basePrisma;
+if (!prismaInitFailed && typeof basePrisma.$extends === 'function') {
+    try {
+        extendedPrisma = basePrisma.$extends({
+            query: {
+                $allModels: {
+                    async $allOperations({ model, operation, args, query }) {
+                        try {
+                            return await query(args);
+                        } catch (err) {
+                            const isConnError = (
+                                (typeof err.code === 'string' && (err.code.startsWith('P1') || err.code === 'P2024')) ||
+                                err.name === 'PrismaClientInitializationError' ||
+                                err.name === 'PrismaClientRustPanicError' ||
+                                err.message?.includes('Connection pool timed out') ||
+                                err.message?.includes('Server has closed the connection') ||
+                                err.message?.includes('Can\'t reach database server') ||
+                                err.message?.includes('connect ECONNREFUSED')
+                            );
 
-                    if (isConnError) {
-                        logger.error(`[Prisma:ConnectionFailure] ${model}.${operation} failed: ${err.message}`);
+                            if (isConnError) {
+                                logger.error(`[Prisma:ConnectionFailure] ${model}.${operation} failed: ${err.message}`);
+                            }
+                            // Re-throw so Express error handler catches it cleanly as AppError (503)
+                            throw err;
+                        }
                     }
-                    // Re-throw so Express error handler catches it cleanly as AppError (503)
-                    throw err;
                 }
             }
-        }
+        });
+    } catch (extErr) {
+        logger.warn(`[Prisma] Failed to apply $extends: ${extErr.message}`);
+        extendedPrisma = basePrisma;
     }
-});
+}
 
-const prisma = globalForPrisma.prisma || extendedPrisma;
+const prismaTarget = globalForPrisma.prisma || extendedPrisma;
 
 // ── In-memory fallback delegates for optional/extended models ────────────────
 function createInMemoryDelegate() {
@@ -182,6 +204,23 @@ function createInMemoryDelegate() {
         count: async ({ where } = {}) => store.filter(i => matchesWhere(i, where)).length,
     };
 }
+
+// Transparent Proxy wrapper to ensure any missing or uninitialized model degrades gracefully
+const fallbackDelegates = new Map();
+const prisma = new Proxy(prismaTarget, {
+    get(target, prop) {
+        if (prop in target && target[prop] !== undefined) {
+            return target[prop];
+        }
+        if (typeof prop === 'symbol' || prop.startsWith('_') || prop === 'then') {
+            return target[prop];
+        }
+        if (!fallbackDelegates.has(prop)) {
+            fallbackDelegates.set(prop, createInMemoryDelegate());
+        }
+        return fallbackDelegates.get(prop);
+    }
+});
 
 [
     'courierReview',
